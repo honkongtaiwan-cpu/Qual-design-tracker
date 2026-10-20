@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>設計進度表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0b0d; --panel:#16161a; --panel2:#1f1f25; --line:#2c2c34;
+  --text:#f4f4f6; --muted:#9a9aa6; --pink:#ff2e88; --lime:#c6ff3d; --red:#ff4d4d; --amber:#ffb020;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans TC",system-ui,sans-serif;min-height:100vh}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:
+  radial-gradient(600px 300px at 90% -10%,rgba(255,46,136,.18),transparent 70%),
+  radial-gradient(500px 300px at -10% 110%,rgba(198,255,61,.08),transparent 70%)}
+header{padding:20px 16px 8px;max-width:1500px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-family:Anton,"Noto Sans TC",sans-serif;font-size:clamp(30px,6vw,52px);letter-spacing:1px;line-height:1;text-transform:uppercase}
+h1 span{color:var(--pink)}
+.sub{color:var(--muted);font-size:13px;margin-top:6px;font-weight:500;letter-spacing:2px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:9px 14px;border-radius:999px;cursor:pointer;font-size:14px}
+button:hover{border-color:var(--pink)}
+.primary{background:var(--pink);border-color:var(--pink);color:#fff}
+.primary:hover{filter:brightness(1.1)}
+.stats{max-width:1500px;margin:10px auto 0;padding:0 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.stat b{display:block;font-family:Anton,sans-serif;font-size:30px;line-height:1.1}
+.stat small{color:var(--muted);font-weight:500}
+.stat.hot b{color:var(--red)} .stat.done b{color:var(--lime)} .stat.go b{color:var(--pink)}
+.toolbar{max-width:1500px;margin:14px auto 0;padding:0 16px;display:flex;flex-wrap:wrap;gap:8px}
+input,select,textarea{font:inherit;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-size:14px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pink)}
+.toolbar input{flex:1 1 200px;width:auto}.toolbar select{flex:0 1 160px;width:auto}
+.board{max-width:1500px;margin:14px auto 40px;padding:0 16px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:12px;overflow-x:auto;padding-bottom:12px}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:16px;min-height:200px;display:flex;flex-direction:column}
+.col.over{border-color:var(--pink);box-shadow:0 0 0 2px rgba(255,46,136,.25) inset}
+.colhead{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);font-weight:900}
+.colhead .n{font-family:Anton,sans-serif;color:var(--muted);font-weight:400}
+.colhead .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--c)}
+.cards{padding:10px;display:flex;flex-direction:column;gap:10px;flex:1}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:18px 0;border:1px dashed var(--line);border-radius:12px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:grab;transition:transform .1s}
+.card:hover{border-color:#44444f;transform:translateY(-1px)}
+.card.dragging{opacity:.4}
+.card img{width:100%;height:150px;object-fit:cover;display:block;background:#000}
+.cbody{padding:10px 12px}
+.ctitle{font-weight:900;font-size:15px;margin:0 0 6px}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#2a2a32;color:#d8d8e0}
+.tag.p-high{background:var(--pink);color:#fff}.tag.p-mid{background:#3a2a10;color:var(--amber)}
+.due{font-size:12px;color:var(--muted);font-weight:500}
+.due.late{color:var(--red);font-weight:700}.due.soon{color:var(--amber);font-weight:700}
+.cfoot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:6px}
+.move{display:flex;gap:4px}
+.move button{padding:3px 9px;font-size:12px}
+.prog{height:4px;background:#2a2a32}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--pink),var(--lime))}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:18px;padding:0;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:rgba(0,0,0,.7)}
+.dhead{padding:16px 18px;border-bottom:1px solid var(--line);font-family:Anton,"Noto Sans TC",sans-serif;font-size:22px;letter-spacing:.5px}
+form .grid{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:700}
+.full{grid-column:1/-1}
+.preview{width:100%;max-height:180px;object-fit:cover;border-radius:10px;display:none}
+.dfoot{padding:12px 18px 18px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.danger{color:var(--red);border-color:#4a2026}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--lime);color:#000;font-weight:900;padding:10px 18px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+.toast.on{opacity:1}
+@media (max-width:640px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  form .grid{grid-template-columns:1fr}
+  .board{grid-auto-columns:82vw}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>DESIGN <span>TRACKER</span></h1>
+    <div class="sub">服飾設計進度表 · 從靈感到上架</div>
+  </div>
+  <div class="actions">
+    <button class="primary" id="addBtn">＋ 新增款式</button>
+    <button id="exportBtn">匯出備份</button>
+    <button id="importBtn">匯入備份</button>
+    <input type="file" id="importFile" accept=".json" hidden>
+  </div>
+</header>
+
+<section class="stats">
+  <div class="stat"><b id="sTotal">0</b><small>全部款式</small></div>
+  <div class="stat go"><b id="sDoing">0</b><small>進行中</small></div>
+  <div class="stat hot"><b id="sLate">0</b><small>已逾期</small></div>
+  <div class="stat done"><b id="sDone">0</b><small>已上架</small></div>
+</section>
+
+<div class="toolbar">
+  <input id="q" placeholder="搜尋款名、布料、備註…">
+  <select id="fSeries"><option value="">全部系列</option></select>
+  <select id="fPri"><option value="">全部優先度</option><option value="high">急件</option><option value="mid">一般</option><option value="low">不急</option></select>
+</div>
+
+<main class="board" id="board"></main>
+
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <div class="dhead" id="dTitle">新增款式</div>
+    <div class="grid">
+      <label class="full">款式名稱 *<input name="name" required placeholder="例：鏤空綁帶短版背心"></label>
+      <label>系列<input name="series" list="seriesList" placeholder="例：2026 冬季"></label>
+      <label>類別<select name="cat">
+        <option>上衣</option><option>褲子</option><option>裙子</option><option>洋裝</option><option>外套</option><option>套裝</option><option>配件</option><option>其他</option>
+      </select></label>
+      <label>目前階段<select name="stage" id="stageSel"></select></label>
+      <label>優先度<select name="pri"><option value="mid">一般</option><option value="high">急件</option><option value="low">不急</option></select></label>
+      <label>截止日<input type="date" name="due"></label>
+      <label>負責人／工廠<input name="owner" placeholder="例：版師 小美"></label>
+      <label class="full">布料／配色<input name="fabric" placeholder="例：黑色彈性網紗＋銀色金屬扣"></label>
+      <label class="full">備註<textarea name="note" rows="3" placeholder="修改重點、尺寸問題、成本…"></textarea></label>
+      <label class="full">款式圖（設計稿或樣衣照）<input type="file" id="imgInput" accept="image/*"></label>
+      <img id="preview" class="preview full" alt="">
+    </div>
+    <div class="dfoot">
+      <button type="button" class="danger" id="delBtn">刪除</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button type="button" id="cancelBtn">取消</button>
+        <button type="submit" class="primary">儲存</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+<datalist id="seriesList"></datalist>
+<div class="toast" id="toast"></div>
+
+<script>
+const STAGES = [
+  {k:'idea',   n:'靈感',     c:'#8a8aff'},
+  {k:'sketch', n:'設計稿',   c:'#b07bff'},
+  {k:'pattern',n:'打版',     c:'#ff7bd5'},
+  {k:'fabric', n:'選布備料', c:'#ff2e88'},
+  {k:'sample', n:'樣衣',     c:'#ff8a3d'},
+  {k:'fix',    n:'修改',     c:'#ffb020'},
+  {k:'prod',   n:'量產',     c:'#3dd6ff'},
+  {k:'live',   n:'已上架',   c:'#c6ff3d'}
+];
+const KEY = 'design-tracker-v1';
+const PRI = {high:'急件',mid:'一般',low:'不急'};
+let items = load();
+let editingId = null, pendingImg = null;
+
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || [] }catch(e){ return [] } }
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(items)); }
+  catch(e){ toast('空間不足：請刪掉一些圖片或先匯出備份'); }
+}
+function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'),2200); }
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today = () => { const d=new Date(); d.setHours(0,0,0,0); return d; };
+function dueInfo(it){
+  if(!it.due || it.stage==='live') return null;
+  const days = Math.round((new Date(it.due+'T00:00:00') - today())/86400000);
+  if(days<0) return {cls:'late', t:`逾期 ${-days} 天`};
+  if(days===0) return {cls:'soon', t:'今天截止'};
+  if(days<=3) return {cls:'soon', t:`剩 ${days} 天`};
+  return {cls:'', t:`截止 ${it.due.slice(5).replace('-','/')}`};
+}
+
+/* render */
+const board = document.getElementById('board');
+document.getElementById('stageSel').innerHTML = STAGES.map(s=>`<option value="${s.k}">${s.n}</option>`).join('');
+
+function render(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const fs = document.getElementById('fSeries').value;
+  const fp = document.getElementById('fPri').value;
+  const list = items.filter(it =>
+    (!fs || it.series===fs) && (!fp || it.pri===fp) &&
+    (!q || [it.name,it.series,it.fabric,it.note,it.owner,it.cat].join(' ').toLowerCase().includes(q)));
+  const order = {high:0,mid:1,low:2};
+  board.innerHTML = STAGES.map((s,i)=>{
+    const cards = list.filter(it=>it.stage===s.k)
+      .sort((a,b)=>(order[a.pri]-order[b.pri]) || ((a.due||'9')>(b.due||'9')?1:-1));
+    return `<section class="col" data-stage="${s.k}">
+      <div class="colhead"><span><span class="dot" style="--c:${s.c}"></span>${s.n}</span><span class="n">${cards.length}</span></div>
+      <div class="cards">${cards.length? cards.map(it=>card(it,i)).join('') : '<div class="empty">拖曳款式到這裡</div>'}</div>
+    </section>`;
+  }).join('');
+  // stats
+  document.getElementById('sTotal').textContent = items.length;
+  document.getElementById('sDone').textContent = items.filter(i=>i.stage==='live').length;
+  document.getElementById('sDoing').textContent = items.filter(i=>i.stage!=='live' && i.stage!=='idea').length;
+  document.getElementById('sLate').textContent = items.filter(i=>dueInfo(i)?.cls==='late').length;
+  // series filter
+  const series = [...new Set(items.map(i=>i.series).filter(Boolean))].sort();
+  const sel = document.getElementById('fSeries');
+  sel.innerHTML = '<option value="">全部系列</option>' + series.map(s=>`<option ${s===fs?'selected':''}>${esc(s)}</option>`).join('');
+  document.getElementById('seriesList').innerHTML = series.map(s=>`<option value="${esc(s)}">`).join('');
+}
+function card(it, idx){
+  const d = dueInfo(it);
+  const pct = Math.round((idx+1)/STAGES.length*100);
+  return `<article class="card" draggable="true" data-id="${it.id}">
+    ${it.img?`<img src="${it.img}" alt="">`:''}
+    <div class="prog"><i style="width:${pct}%"></i></div>
+    <div class="cbody">
+      <p class="ctitle">${esc(it.name)}</p>
+      <div class="tags">
+        ${it.pri!=='low'?`<span class="tag p-${it.pri}">${PRI[it.pri]}</span>`:''}
+        <span class="tag">${esc(it.cat)}</span>
+        ${it.series?`<span class="tag">${esc(it.series)}</span>`:''}
+      </div>
+      ${it.fabric?`<div class="due">🧵 ${esc(it.fabric)}</div>`:''}
+      ${it.owner?`<div class="due">👤 ${esc(it.owner)}</div>`:''}
+      <div class="cfoot">
+        <span class="due ${d?.cls||''}">${d?d.t:''}</span>
+        <span class="move">
+          ${idx>0?`<button data-mv="-1" title="上一階段">◀</button>`:''}
+          ${idx<STAGES.length-1?`<button data-mv="1" title="下一階段">▶</button>`:''}
+        </span>
+      </div>
+    </div>
+  </article>`;
+}
+
+/* interactions */
+board.addEventListener('click', e=>{
+  const c = e.target.closest('.card'); if(!c) return;
+  const it = items.find(i=>i.id===c.dataset.id);
+  const mv = e.target.closest('[data-mv]');
+  if(mv){
+    const i = STAGES.findIndex(s=>s.k===it.stage) + Number(mv.dataset.mv);
+    it.stage = STAGES[i].k; it.updated = Date.now(); save(); render();
+    if(it.stage==='live') toast(`🎉 ${it.name} 上架了！`);
+    return;
+  }
+  openDlg(it);
+});
+board.addEventListener('dragstart', e=>{
+  const c=e.target.closest('.card'); if(!c) return;
+  e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging');
+});
+board.addEventListener('dragend', e=>e.target.closest('.card')?.classList.remove('dragging'));
+board.addEventListener('dragover', e=>{
+  const col=e.target.closest('.col'); if(!col) return;
+  e.preventDefault(); document.querySelectorAll('.col.over').forEach(x=>x!==col&&x.classList.remove('over')); col.classList.add('over');
+});
+board.addEventListener('dragleave', e=>{ const col=e.target.closest('.col'); if(col && !col.contains(e.relatedTarget)) col.classList.remove('over'); });
+board.addEventListener('drop', e=>{
+  const col=e.target.closest('.col'); if(!col) return; e.preventDefault(); col.classList.remove('over');
+  const it=items.find(i=>i.id===e.dataTransfer.getData('text/plain')); if(!it) return;
+  it.stage=col.dataset.stage; it.updated=Date.now(); save(); render();
+  if(it.stage==='live') toast(`🎉 ${it.name} 上架了！`);
+});
+['q','fSeries','fPri'].forEach(id=>document.getElementById(id).addEventListener('input', render));
+
+/* dialog */
+const dlg=document.getElementById('dlg'), form=document.getElementById('form'), preview=document.getElementById('preview');
+function openDlg(it){
+  editingId = it?.id || null; pendingImg = it?.img || null;
+  form.reset();
+  document.getElementById('dTitle').textContent = it ? '編輯款式' : '新增款式';
+  document.getElementById('delBtn').style.visibility = it ? 'visible' : 'hidden';
+  const v = it || {stage:'idea', pri:'mid', cat:'上衣'};
+  for(const k of ['name','series','cat','stage','pri','due','owner','fabric','note']) form.elements[k].value = v[k] || '';
+  preview.style.display = pendingImg ? 'block' : 'none'; preview.src = pendingImg || '';
+  dlg.showModal();
+}
+document.getElementById('addBtn').onclick = ()=>openDlg(null);
+document.getElementById('cancelBtn').onclick = ()=>dlg.close();
+document.getElementById('delBtn').onclick = ()=>{
+  if(!confirm('確定刪除這個款式？')) return;
+  items = items.filter(i=>i.id!==editingId); save(); render(); dlg.close();
+};
+form.addEventListener('submit', e=>{
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(form).entries());
+  data.img = pendingImg; data.updated = Date.now();
+  if(editingId) Object.assign(items.find(i=>i.id===editingId), data);
+  else items.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), created: Date.now(), ...data});
+  save(); render(); dlg.close(); toast('已儲存 ✓');
+});
+document.getElementById('imgInput').addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ const im=new Image(); im.onload=()=>{
+    const s=Math.min(1, 600/Math.max(im.width,im.height)); const cv=document.createElement('canvas');
+    cv.width=im.width*s; cv.height=im.height*s; cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+    pendingImg = cv.toDataURL('image/jpeg',.72); preview.src=pendingImg; preview.style.display='block';
+  }; im.src=r.result; };
+  r.readAsDataURL(f);
+});
+
+/* backup */
+document.getElementById('exportBtn').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(items,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `設計進度備份-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  toast('備份已下載');
+};
+document.getElementById('importBtn').onclick = ()=>document.getElementById('importFile').click();
+document.getElementById('importFile').addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  f.text().then(t=>{
+    try{ const d=JSON.parse(t); if(!Array.isArray(d)) throw 0;
+      if(!confirm(`要用備份裡的 ${d.length} 個款式取代目前資料嗎？`)) return;
+      items=d; save(); render(); toast('匯入完成');
+    }catch(_){ toast('檔案格式不對'); }
+  });
+  e.target.value='';
+});
+
+/* first-time sample */
+if(!items.length){
+  const in5 = new Date(Date.now()+5*864e5).toISOString().slice(0,10);
+  items = [
+    {id:'demo1',name:'鏤空綁帶短版背心',series:'範例系列',cat:'上衣',stage:'sample',pri:'high',due:in5,owner:'版師',fabric:'黑色彈性網紗',note:'這是範例，可以刪掉',img:null},
+    {id:'demo2',name:'皮革低腰工裝褲',series:'範例系列',cat:'褲子',stage:'sketch',pri:'mid',due:'',owner:'',fabric:'仿皮＋銀扣',note:'',img:null}
+  ];
+  save();
+}
+render();
+</script>
+</body>
+</html>
