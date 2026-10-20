@@ -64,6 +64,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink2)}
 
 .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}
 .board.single{grid-template-columns:minmax(0,1fr)}
+.board.gallery{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.upl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:220px;border:1.5px dashed rgba(42,37,37,.4);border-radius:12px;background:rgba(250,246,244,.35);color:var(--ink2);font-size:14px;letter-spacing:3px;transition:background .15s}
+.upl:hover{background:rgba(255,253,252,.7)}
+.upl .plus{font-family:var(--serif);font-size:56px;line-height:1;font-weight:400;letter-spacing:0}
 .board.single .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
 .col{background:var(--panel);border:1px solid var(--line);border-radius:16px;min-width:0;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);scroll-margin-top:16px}
 .col.over{border-color:var(--ink);box-shadow:0 0 0 2px rgba(42,37,37,.15) inset}
@@ -118,8 +122,10 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
   .title{display:none}
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .board{grid-template-columns:minmax(0,1fr)}
-  .board.single .cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .board.single .cards,.board.gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .upl{min-height:170px}
   .dgrid{grid-template-columns:1fr}
+  .toolbar input{flex:1 1 100%}
   .toolbar select{flex:1 1 0}
 }
 </style>
@@ -154,7 +160,7 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
       <div class="mlogo">QUAL</div>
       <button class="iconbtn" id="addBtn2" aria-label="新增">＋</button>
     </div>
-    <div class="title"><h2 id="viewTitle">全部進度</h2><span>服飾設計進度表 · 從靈感到上架</span></div>
+    <div class="title"><h2 id="viewTitle">首頁</h2><span>服飾設計進度表 · 從靈感到上架</span></div>
 
     <section class="stats">
       <div class="stat"><b id="sTotal">0</b><small>全部款式</small></div>
@@ -210,6 +216,7 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
   </form>
 </dialog>
 
+<input type="file" id="uplInput" accept="image/*" multiple hidden>
 <datalist id="seriesList"></datalist>
 <div class="toast" id="toast"></div>
 
@@ -336,31 +343,43 @@ function render(){
   const list = filtered();
   const order = {high:0,mid:1,low:2};
   const stageView = STAGES.find(s=>s.k===view);
-  const shown = stageView ? [stageView] : STAGES;
-  $('board').className = 'board' + (stageView ? ' single' : '');
+  const sortCards = arr => arr.sort((a,b)=>(order[a.pri]-order[b.pri]) || ((a.due||'9')>(b.due||'9')?1:-1));
+  // 靈感／設計稿／打樣頁：沒有外框，只有上傳格＋款式
+  if(stageView && stageView.k!=='live'){
+    const idx = STAGES.indexOf(stageView);
+    const cards = sortCards(list.filter(it=>it.stage===stageView.k));
+    $('board').className = 'board gallery';
+    $('board').innerHTML = `<button class="upl" data-upload="${stageView.k}"><span class="plus">+</span><span>上傳圖片</span></button>` + cards.map(it=>card(it,idx)).join('');
+    renderSide(stageView);
+    return;
+  }
+  // 首頁：只留上架
+  const shown = stageView ? [stageView] : (view==='all' ? [STAGES[3]] : STAGES);
+  $('board').className = 'board' + (shown.length===1 ? ' single' : '');
   $('board').innerHTML = shown.map(s=>{
     const idx = STAGES.indexOf(s);
-    const cards = list.filter(it=>it.stage===s.k)
-      .sort((a,b)=>(order[a.pri]-order[b.pri]) || ((a.due||'9')>(b.due||'9')?1:-1));
+    const cards = sortCards(list.filter(it=>it.stage===s.k));
     return `<section class="col" id="col-${s.k}" data-stage="${s.k}">
       <div class="colhead"><span><span class="nm">${s.n}</span><span class="en">${s.en}</span></span><span class="n">${cards.length}</span></div>
-      <div class="cards">${cards.length? cards.map(it=>card(it,idx)).join('') : '<div class="empty">把款式拖到這裡</div>'}</div>
+      <div class="cards">${cards.length? cards.map(it=>card(it,idx)).join('') : `<div class="empty">${s.k==='live'?'還沒有上架的款式':'把款式拖到這裡'}</div>`}</div>
     </section>`;
   }).join('');
-
+  renderSide(stageView);
+}
+function renderSide(stageView){
   $('sTotal').textContent = items.length;
   $('sDone').textContent  = items.filter(i=>i.stage==='live').length;
   $('sDoing').textContent = items.filter(i=>i.stage==='sketch'||i.stage==='sample').length;
   $('sLate').textContent  = items.filter(i=>dueInfo(i)?.cls==='late').length;
 
-  const titles = {all:'全部進度', late:'已逾期', high:'急件'};
+  const titles = {all:'首頁', late:'已逾期', high:'急件'};
   $('viewTitle').textContent = stageView ? stageView.n : titles[view];
 
   // sidebar
   const cnt = k => items.filter(i=>i.stage===k).length;
   $('navStages').innerHTML =
-    `<button data-view="all" class="${view==='all'?'on':''}"><span>全部進度</span><span class="c">${items.length}</span></button>` +
-    STAGES.map(s=>`<button data-view="${s.k}" class="${view===s.k?'on':''}"><span>${s.n}</span><span class="c">${cnt(s.k)}</span></button>`).join('');
+    `<button data-view="all" class="${view==='all'?'on':''}"><span>首頁</span><span class="c">${items.length}</span></button>` +
+    STAGES.filter(s=>s.k!=='live').map(s=>`<button data-view="${s.k}" class="${view===s.k?'on':''}"><span>${s.n}</span><span class="c">${cnt(s.k)}</span></button>`).join('');
   $('navQuick').innerHTML =
     `<button data-view="late" class="${view==='late'?'on':''}"><span>已逾期</span><span class="c">${items.filter(i=>dueInfo(i)?.cls==='late').length}</span></button>` +
     `<button data-view="high" class="${view==='high'?'on':''}"><span>急件</span><span class="c">${items.filter(i=>i.pri==='high').length}</span></button>`;
@@ -412,7 +431,10 @@ function moveTo(it, stage){
   const n = {...it, stage}; upsert(n);
   if(stage==='live') toast(`${it.name} 上架了`);
 }
+let uplStage = 'idea';
 $('board').addEventListener('click', e=>{
+  const u = e.target.closest('[data-upload]');
+  if(u){ uplStage = u.dataset.upload; $('uplInput').click(); return; }
   const c = e.target.closest('.card'); if(!c) return;
   const it = items.find(i=>i.id===c.dataset.id); if(!it) return;
   const mv = e.target.closest('[data-mv]');
@@ -452,15 +474,35 @@ form.addEventListener('submit', e=>{
   upsert({...base, ...data, img: pendingImg || null});
   dlg.close(); toast('已儲存');
 });
-$('imgInput').addEventListener('change', e=>{
+function compress(f){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onerror=rej;
+    r.onload=()=>{ const im=new Image(); im.onerror=rej; im.onload=()=>{
+      const s=Math.min(1, 640/Math.max(im.width,im.height)); const cv=document.createElement('canvas');
+      cv.width=Math.round(im.width*s); cv.height=Math.round(im.height*s); cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+      res(cv.toDataURL('image/jpeg',.72));
+    }; im.src=r.result; };
+    r.readAsDataURL(f);
+  });
+}
+$('imgInput').addEventListener('change', async e=>{
   const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=()=>{ const im=new Image(); im.onload=()=>{
-    const s=Math.min(1, 640/Math.max(im.width,im.height)); const cv=document.createElement('canvas');
-    cv.width=Math.round(im.width*s); cv.height=Math.round(im.height*s); cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
-    pendingImg = cv.toDataURL('image/jpeg',.72); preview.src=pendingImg; preview.style.display='block';
-  }; im.src=r.result; };
-  r.readAsDataURL(f);
+  try{ pendingImg = await compress(f); preview.src=pendingImg; preview.style.display='block'; }catch(_){ toast('這張圖片讀不了'); }
+});
+$('uplInput').addEventListener('change', async e=>{
+  const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
+  toast(`上傳中… (${files.length} 張)`);
+  let n=0;
+  for(const f of files){
+    try{
+      const img = await compress(f);
+      await upsert({id:newId(), created:Date.now(), name:f.name.replace(/\.[^.]+$/,'') || '未命名', series:$('fSeries').value||'',
+        cat:'其他', stage:uplStage, pri:'mid', due:'', owner:'', fabric:'', note:'', img});
+      n++;
+    }catch(_){}
+  }
+  toast(n ? `已上傳 ${n} 張，點圖片可以改名稱和細節` : '圖片讀不了，請換一張');
 });
 
 /* ---------- Excel ---------- */
