@@ -3,114 +3,182 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>設計進度表</title>
+<meta name="theme-color" content="#c2b7b5">
+<title>QUAL 設計進度表</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
-  --bg:#0b0b0d; --panel:#16161a; --panel2:#1f1f25; --line:#2c2c34;
-  --text:#f4f4f6; --muted:#9a9aa6; --pink:#ff2e88; --lime:#c6ff3d; --red:#ff4d4d; --amber:#ffb020;
+  --bg:#c2b7b5; --ink:#2a2525; --ink2:#4a4343; --muted:#7a706e; --line:rgba(42,37,37,.14);
+  --panel:rgba(250,246,244,.52); --panel2:rgba(255,253,252,.78); --dark:#2a2525;
+  --late:#9a3a36; --soon:#8a6420; --ok:#4f6b4a;
+  --serif:"Cormorant Garamond","Noto Sans TC",serif;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans TC",system-ui,sans-serif;min-height:100vh}
-body::before{content:"";position:fixed;inset:0;pointer-events:none;background:
-  radial-gradient(600px 300px at 90% -10%,rgba(255,46,136,.18),transparent 70%),
-  radial-gradient(500px 300px at -10% 110%,rgba(198,255,61,.08),transparent 70%)}
-header{padding:20px 16px 8px;max-width:1500px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
-h1{margin:0;font-family:Anton,"Noto Sans TC",sans-serif;font-size:clamp(30px,6vw,52px);letter-spacing:1px;line-height:1;text-transform:uppercase}
-h1 span{color:var(--pink)}
-.sub{color:var(--muted);font-size:13px;margin-top:6px;font-weight:500;letter-spacing:2px}
-.actions{display:flex;flex-wrap:wrap;gap:8px}
-button,.btn{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:9px 14px;border-radius:999px;cursor:pointer;font-size:14px}
-button:hover{border-color:var(--pink)}
-.primary{background:var(--pink);border-color:var(--pink);color:#fff}
-.primary:hover{filter:brightness(1.1)}
-.stats{max-width:1500px;margin:10px auto 0;padding:0 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
-.stat b{display:block;font-family:Anton,sans-serif;font-size:30px;line-height:1.1}
-.stat small{color:var(--muted);font-weight:500}
-.stat.hot b{color:var(--red)} .stat.done b{color:var(--lime)} .stat.go b{color:var(--pink)}
-.toolbar{max-width:1500px;margin:14px auto 0;padding:0 16px;display:flex;flex-wrap:wrap;gap:8px}
-input,select,textarea{font:inherit;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 12px;font-size:14px;width:100%}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pink)}
+html,body{max-width:100%;overflow-x:hidden}
+body{margin:0;color:var(--ink);font-family:"Noto Sans TC",system-ui,sans-serif;font-weight:400;min-height:100vh;
+  background:var(--bg) url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAwICQsJCAwLCgsODQwOEh4UEhEREiUbHBYeLCcuLisnKyoxN0Y7MTRCNCorPVM+QkhKTk9OLztWXFVMW0ZNTkv/2wBDAQ0ODhIQEiQUFCRLMisyS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0v/wgARCAPoBkADASIAAhEBAxEB/8QAGQABAQEBAQEAAAAAAAAAAAAAAAEDBAIF/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAEC/9oADAMBAAIQAxAAAAH61lmgAQCgiwAABZLCLCkAEsAFlQBBYACpUBUpAFgoEsALASwWUAgAAABFBLAAAAssAALAFEsAAAFgoIBAoFACAAAgFlJLAAAAACpQABZQABASwAqABQAAAAAAAgKlFgAAAAJSAgBSUN6CyrKJFi0IIAApYSURYJQlglEWCwlSrFiRYtBKAICgAUCWIAAlEoAJYAAAAJRFEoQABRFgsFSgCURYAAALBYpACiWCwAAARQIAARRAAAUAACyhKIogJYAUEABQAAAAAAAAAFgAAABFglAAHQBQAABUEBQBUksVKIsEsCiBEsFBKIFAAAAFIBZRKIAESiVCpRLFKSLFAoSKIAsAAAEoigAAACLAsAUEWCglAACLAAAAQAAAAFIsABRKIoiwLABKIUAhSUAAAAAAAAAAFgAAAAAgAAOgLUqAoAgACAqypAsAliQLQkCpYLBUABRKgsqAoAAAAIligiCrCAtCAoIAACggAAEAAACggACUQKCLKAAAoIAlEAAlgAQUAFAABKAAACAspFgWAEoAAAAAAAUEAAWFgACiWChAARRAb2VVlACxEpYAAAAQSwAlAQAAiwsoSwqUSwAoQAFAASwAAiiAWCgUIAEJVAFQACAixQAAAAAQABKWLEqUAAAAgUEASwAgFgoKlAEsBQAABFAAAIAAAAAQoFlJYFlIAUSwAAsCgASwAKJKN0oooqAQCUQKAAliJYoACWAAAACBYAAoCAoAACUQAAEUSygBYAAgACyqAIWWIBFKCJSwAAICikWAAAIBZYARYAAAQAEoSgBQJYUAAAAAABBUpFgAAAlhQAAUCBQAJYCghQCkBFACWG5RZQACUEsEsUAESwSxQAIQWUlgsCgSiAAAoAAABCpSAAAAAAAAAAWVAAWKIEAAABYAAACpQESxQRZVgQABKIsAAIAAAACgSiUCiAAUEACVCgAlCAAAlAABZQQoAEsKAACgEAFCLDagsoIUBKJYJYoAIlL5WABAlEokWKAKCFAlEoAAAACAAAAAAAAAAAIsFlLKCAsqAJYoAEKQpAALKAgEACggAAAgAAlEAUQAFSgAAAAolgAAAACgkWAAAAACykBQAJQAAsoABKAAGtlUEAWAsAVKIAACSiSwAEKESlgBRKSBaAEABQAIUiwAAAFIAAAABRAABABZQBKWASiKAEsABQBABAAUEBQRLAAACKAIABYKCggFgsoSwAAAUEsAEsFCKIoiwAFJQJQAABYKAAAAADWygAFlCACgRYAAQElgACCLUACglJAqoUAAAAAEAWAAAAAFgUAAAAIlEWAqgCAAAAACUAJRCkACAoIAAgAAAAAQBRLBQVKAJYCgEsKABUICggAABAsolEoASgAAAAAAsFSgAGtgoKABLAAFSiLAQAkogEsAAAKACUIUAAAAAAgKCKIAUSwAAoAAQFABEolFlBLAABZUiwBQAAASLFFSFWBAEsAAAAAEsAKAABZQAQApCxSBQAAQAAAQAFAABCkKgoAAAAAFlAANQtCUAAgACgJYJYAJYQCUQoAlIsqxYAJQAAKkCgAACFIAUAEABUFAAAACAAAJYAoAAAAAAAAEsqQKSoAlgABYAACUQFspACgACWAApAWWApKEWBRAWAlgABQJYKgAAAsCwUAACygAGpQBQAQAAUBAECwSwgACUFSLBYWwAAQFALACWUAAAAllABCywAAWUAAAAEKlBEBQAAAAAAAAAEsAJZQESiKIsAAAAJQWABYKlCCgiiFAEsFABKAIsLFICAAsoAAlCUICggFlABQAADYCgABKCUQKBAJYWWCXyJYWWAFsqIKAAACCkKsWAEoAAAASgAlgAAoSgAAACJYoIACgiyiUQKAAKRYAgEWKACAAAARRFEAAAUQAAAAFSgAAAAAAAEWACUAAAAAAQChFgBSgAACwbAoAAAAAEsEpYBLBLCAgBQBLCoKCAqUAAsAAAAQoAAAEAACgAAAAASiAIKAACwAABQARAUQsEBQSgiwAAAEAABRLAAAUiiAWUAAAAJQAABLAAACgiwAAAAASiAoFlAAANgVBQAAAAIALAJRJYQAAAEAoAACpAooI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ARYAAAAAAAAAAAAAQCUQFAABAAAALKAAAAAAAALKAAAAJRALKJRpZVWUUASkAIFWACAiiAAASwAqUQAEsFlEUgBUixVlQCBQAQCggUsAAAAAAAARLAFAAgFlAEsKAQsUlEAAASwFIAAAAAAAAAAACAAASgAACAAAAWUAAAEKgoAAAKCWUAAASiUANLKtKAhQlgBFigAQAgAAABKEWBRAJRFAIlLKAJFALAAAgFAliliFLAAAALCAqWAAAACUCFAQUEAsoCAACFgLBYAAABKCFSgAAAAgAAAAAAlgAAAAsFgLAAAAsFAAAspALKAAACkUaBaUUQQsogAIFSwASiAASgAAQqUSwABAVLCoSygARbBAAUEBVgAAAAAABAUCAAAlgoSLFUABBQBAWVEoEsAACwAAAgLAWCpQBLAAAAAAAACAAAAAAAAASwAoKAAAABQlAABQA0oUFSgAgACwCWAAEWBYAAACFAIAAAgEWFSkoARYAoAAAAAAAAAAAAEAABCksAoAlhZYUIAAlACUQAFgAAAQApKEUAARRFEUQAAAAEAASgAAgsoAIWABQKAAACygAAAFQUGtlAFAAlAICBUsQFAAgAAAEollEsACUAEFhKQpCpRLAFAAAAAAAAAAAAASwAAAAABEsUolAAEAALCAAAAAAiwWUAAUEsAJQiiAAAEAAAICgAAgKCAAFBQAAABYKgoAAFlANVACyiWAACWACAli0AEAlAAAACWBABUpAAAWCAoICgAEoAAAAAAACAogBYAAAAIAlKAAACALBYEWAAAAAAAAACwAAAAJRCkAAikWCWAFAAAlCURYCgCykoAAAWURQAAKSgBsAAogAEsEsUABFAEsABCgAAAgCUAlQAAABAUAEABYCgAAAAAAAASwAAAAAAAAAAWAEWAABAAAAAAAAAAAAAAAAlQAAAEEsAKAlAAAAAChKEUAAAAqUAAUAANaAFlgAAlEligAJQAlEAAAAQWAAAAgFEAAACJSgAAQFSghQAAAAgKAlCWAAAAABQAlgAWIAAIVAAAAABLKAJYVKAAAAAAAAQAACWCWCwUEBQAAALBQCFAAAAABQAAAAbWUWUSiFIACAgUsAJYKCKIAACLAAAABLACwAAAECgAAiwAAoBCgEKgpBZQACLAsAAFAEBUsAAQACAAAAAAAlQpBYKlAAAAAAAAIAABLBKIUAAAAAAAAsoSwWUAAAFJQAWUQANwKAAEWACWAKlEAlAAEWAAEWAAAAEAACAoAAIligWKJRFgAABQQAFgUCWFSgBAKQoSgAIliggKCCAAAAAAACURYAFhQAAAAAAAARYAJYAAAAAAAAAAVKASgAAAAoAAAAbgoAAEsAWLEBQIAAABKIBLAABZSAEAAAAAJQhSAAFAEAABYKCAAAoQRShKIohQQWUAASkixQARAAAAAAAAAAASgAAAAAAAAACAEAAABCgAAAAFAAAAAAAKAABQiw3sFAAAlEAgAJYoAAAAEAlgAAAAlgACAoICghC2WACgIWKQAAFgAAAUAAAIItBAUAAICgQAIlgABLBQSwVBUCyhBUFgVKAAAKEAAAAAlglgAAAAAAAIUCyiUAAAAAAVKALKAJYbgoAAEsAIFBEsUAAAAQASwAAAAAgAQAFAAlACUAEACgSwAAAALCgAAEAFlCCkKgoAAEsQCAAAASwAALAAAABQAAAqUAiwAAAQEsAACiAAAAAAAoAAAAAAFAAUJRA3sFAAAlElipYUIligAAAJYAARYAAAAQAAAAAICgACFgAAAAAAAVBQCFABLKQAAAFSgACCAQAAAAhSCglgAAABUoAAAsCwAAAAQCWAABRFgAAIUAACygAAAAACygAAAG9lAAEoIEpYABKIsALAsogEoiwSiKIsAAEsABSAAAAlABKIABQSwAKIAAAUiwAsAABKEsKlFgpChEABAAAASgAACAAAAoAALLBQgAAAAIACKICoAAAAAAAKAAAAUgAAKlAAAN6AAAEABAoAACBYAAAAEAlhYABBQSiJRAoAACUAAJRFhQJQlEKAJYALKJYAAAEoSkUCFCVC0gAliAAAAAAAARYACksoAAKAAIAAAACUQACWAAAAAAAAFIUACwVAAAURQAAsHQAAACAAgUgWBYLLAAAAAQAJQgAiwAsAEBQAAAAAACCgSiLCpQCAAAAWAAEixalAAAAAAEsAQAFBAAAEUgAFlIBQAAqAAAAUgAAEogEoiiLAAACAoAFgVCgAAAUACCpQADoAlhUFBACKIAAAACAFgVAAgAACFAlJAoAAAhUFQUAgAsCyggABUAAAAAABKQCygAAICgAJYAAgAAhQAJYAAAVKAAAAAAAAAAAAQAACWAAACUAAFgBUoAABQAJYLBQAdAIACoAEsVLAAAACLAAABLAAAAAAEixQAAEogFlIAoiwAAAAAAAAAAASiAAAqCgAAAASwABAEoiwUAEsAAAFgoAAAAKCUIsAAAAEogAIAAAAAAAsAFlAAAKgoEBZQADoBAAAAAQEUsWAAEAAAABAAAgAKCASykCgAJQAlhQAQpAAAAAAACkWAAEWAAAFSoCgAAQAIAAAAAAlEBUAAFAAAABUCwUEAAAABAAJRAAFgWAoAAAAACipKhUAFSgAh0AAoAAIBLARbAAAgAAAEsFlAEAEBUChJZRLAFABAUAEABUsFACUJQASiUAEogAIAABYKgoCUAgQAAAAAAAlIAAAACgAAAAAqUgAAAAAIsBBZRKIUSgAAAAAABYKCAAWCgA3ABQKEBAICCgAgKlgAAIALBSAAICwFgWCAoAAICgAAAIAFAIiyqAAAAAlEABKiWACgVAKkCgAgAAAACAAAAAAAsoAAAAAsAhQEFABLAAAAAAAAAAAAAAAAAAAsoBuAClAICEBAFASwqUEAAEAAUSiAAABIsAUAAEBQAAAEsBSFIABYKgqCpQQAAAASwWUgBSLEBbLAAEAAAAEAAAAABSLACoKAAAABLCwAFgoIAAAlAAAAAAAAALLAAAAAAUA3AsosFQASWCWKKQAEsFlEBLAAAsFQAAAAAiUQAKAABLKAAJRAUgAAAAAAAAAAAlAgoQqQKBUIAAAAABKEAAAABUFlgAAqFAAAAlgAAAsAAAAAAAAAAAAoABAAAAALBQbgoAAAICAhVSwAgKlICAAAALEBQAQAAFgQFAAAlgqUAgFBLAsACwAAAAAAAAAABBFBAAAAAAAAEsAAAAAAAFQAAWUAAARSAAAAAAAAAAAAAAAAAAAAAAAsCg3A9eaWWAACWElgsFCxYJQIARYAAAWAACApAsqJYAAApBUAFSkoARYAWBUFgACkAAAAAAAACEqpYAAgAAAAAAEAAAAAAAAAAspAVAAAAAAAAKQAAAAAAAAAAAoBAAAAAAb2C2CgAASwixYCgQAEogAEsAAAAAAIAAAEQUAAAACgASwAAAAAWUASgBLAAAAAEBUsQFLAAEAAAAASwFIACwAFlEogAAAFCKIAAAAAAAAAAAUgBRKIogAFlAIAAAAADcCylAAAlElhAopAAiWKAAlgAAAAACRSxYgLFEABKAAACygCWAApAAALBUFAAlgWAAAAIACpSJYoIAWAAAAAAEWB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n321GHHH30FG0l9GFH33jmkHSiihy7iBDDCywAATDgHHygADShAADzygQDxQBz1TzmWhywG0kEEGkEEW1EFH20EPX0EEH3X32kf21332kElU3kF30F0G11HG0AVVTyCSjbkgAAjRDwgAAAA0wQj3SxwBRzwhTzwgBVCjATyj3wUkEEF30kFWkEEEHUEFF1UlH3HXmFWHHXnEEEUH31H30XkG2kEH0kE1hQTiIDagQCAChjygAADTzlGzziAATzyzzywABTyUDzyjyhEE203322lWkE0H9EGEEF1UHEkU01UF0EEFUFEXGEWlHmGnW0E13lX2lBRVnH3wmhSzTzyggABC0UEFXwBTzQyzxjwzygBADATwEAx3333330FW0kGHUG1GkFH0FU21XmkH20EFWk1UEkWkFEEFH33nUnn3kj1XwDTyxDDwDTzyhTyzXy01HyiDxzyADTjTyiAAABXwDzj3333210lH30kFEn30EEX0El3100EGlU0EHH0FWn0EF0k0H2FEmHzmQTUde0BXwWDQATzxUBCwGjn21XABSgQhwjTDgwgAAEDxn1Xn33333kG1nWkE0HVn0EVEEHXnX30H330EEHWlGH2EX2HUn0lWkGgRyAiXTMx3wwBFDHzTwADQkEVzziDwihQD2AhSDiQAATzihX0F3Vn3WUH20FEEEEnXQ330232FH30lVHm0EFX0El0F3G0CnX3W1GxThATkRzjzyACCAH3DAAhDw1nG3ADAABThQgDxTjwABz2gFXkHWmW130HX0kEEFW1HzlHGHX0FX32kFF2kEUH0EFVEEG2RRX33UnVSACihTjikAAAAFzwBTQACT0wlHzwgAzQBAQzxDygADwkkV30lX33330H3330ElFEXWkEEEFEFH3n01332l0EEkFVUH31RRX2lGlliACTRDDiAwwAg3y21TwAT333323AWjTQABzwijygADzzx2n30X3lX3233330FWFXlmEEEEH00EEGFH3lX30kX1VGkH2nxgH0lWGnwABRTgARzwWCGzz13zwBBDXz3jAACjzgQhDzwRUgABTyEEHX31X0FHX333nUE03nWwkGEEH330EEkF31H3n310EG2X2lh1H2FlHxQEDynjThHzgACBDziAAAABDzygCwgHkAAADzhTyAABQEFUAH3330EFH33mEUH130nSV0kEEH30kEU320H1333kEH33GmymnkWkEGmghTyhSgDSgQCyz2gAAABCjxm0jyAkAAABTyBzggAADDhXkHX330EUnX0kEEFH2GkH3GEFU332kFX330FX3XGEEHX2GXiim1WFViniwTgASgATxQDTTygTwzwBWHDzxgyADygBTyDzzgAAygEkEEEHXk12EH2kEH20EGlH0EGH3HnUnHX3W0FX2kEEEFH2lmiyBUWHyyijDgABTwhzhShjznSkHzi30HzTyygATywlXwADygBSARiEEEFXmk30EFmkE0EEH3kFEkkH321WkEEEU0H330GkEX1mGnxD3FU3TACgSgAACDTDxDAFCAHEDwjX0FTXAiABCXBTzAABAQAwDygEGEV21330EkUkX2kEX20EFEFX31EG1233HGXGHGn2lHW1nFRyEVH0mhShBwxAAAQhQgEBQ1EER20B3yzzywAATUADygCwHTQASAECUFW13X30H120lVX333kEEEHnHEEH3HUFX1cEFX32GEH2EGVUkEX2CxSADTQABAQATgAEHUmEHXxxBTzzzwgTQgADywDizhRRQEH1kFEH13l0H3mHF0nHHG0EEEH0knEE2kEVlVWEEH2kEEF00GlWEEkGnxUAADgAABChSAgAS0UUlUgAhTzzzyxzwACBSwgAgR1TCBT232G33mH0HWkUWEUGHH0kEX2kH0FWn0H31lkEEX200UH2kHFWlX3FHFlQAABAAAABAzwjjTR1D2gAAjyDTzzzh0ATxyxTz3lAATz321nXn0EEEEF123000FHm0lnVX0EWFFHXk2mEEHVHEEHmEEFXH2lXTCBgBQAQAAACggCTwwD0ADEEDwABDTzyAABSxyhzzzzxhSz23kF0UkEEEEFXlHFEFUmX0EUXVUEkEFUlXFFkFX30kFWEEGF1X31lQyxABCwAAAxyAABzBwyAFAAADwgQAAAAEABBTzzhTzAARTX2EU31X10mkFUkEGkEU0EG0FFVW0H0EFGW0EUEEEFX0FX332mlHn2knzQiwDCwADSQgABTxxAQBwAADTjwAQAQwSgADTTzyA0hRT20H333332GUW0kF2EF30EH0kVVFkEEEVX331FWkUl3mHWl2lWEEHWFUBCxgADQgDTzwwDzz0AAAFTxhDTjDwDzxwBQgAzjgiSlT3gEXn3HnnW1HX3UFEEFWEEUHX1WkEEEEEFGH0kGEHX32FX331UHX1UDUADywABCxTzyjgTyDSgCDjzTgByxCwDzzwETBDDgSjwBHSwF3WkEEEFGEEFEEEE3001W2n0W0UkUEEkEHkEEEFX30FX2HWUEHVEF0FTzywADxTzziBQjWz0AExTyARjyxBzzzwABzkQDwBC0ADwFWGG0G002k010mkX2H23WmFVXH20EF30UGFEGEFEH0l2kFV0EEFWngFTTzwATxTzxwwChX1gASACABzwBQgBDTQATATygwQzSgBUH0EEFX32V3HH2HV30kHU0EF1UFXG0330kFUEXkUEH2HXkl2UEkFHxQFBRzyhSwDTyjyigTzzT0gAARzzzygwBAwAQACjwCBAgABkH2l0EUWFXW0FUlHX22330kn1Ul3HXnmUEF2lW330nmlHH32nGFE3gABDTxxAhDRDDRDBQzigDyyABDzyBTzDxzzjTxzzxBQiwQFkF21WlEEWlH310H31WH3332n0nH032mEEEH0EX33n330kH32FW0G0mwAABxzygAChRwAwCFGgBDxgCRDQBBDgBTChTzwAgjATEwShX33320EGHX3mkH3kEF2FHW1G21X2EGXEEH0UFW0333HFH20FHWn2GgyyxSCCAASggyiDxz0ABBDwRCAwBDQiDzzzyygHQgQABDwBR33z3kGln32n2H3033m3n30lH1HHUn2n0H22VH332EE0l30FU0H2yTzzDwTxwyhziAQBHjgAAQxwATyygTjQzyhyBCAjyjQBXzyxRD2kEUGlVX30kV3333333Hn0m0EFXn21EX3X0nX30EFW13Gn3031RTzgADTzzxTygAhymAwABDyjzDTzzyBTzjDwwBDzjRwATDyBQj2lHWHFX3321X2GFUGHWkEGFE0n1X200X3X2kHX00F2l0EH3312mnDQADxzTwizx23zUGnygBABQADjzwwxzxzjSwDQABQkCAADwX30EEEFH0330HkEH020GkEEEH2lH33XVkU0EEFTmU30n0X30E0nlURgADyBDzSgBz2BwHlWyy0AQ30hSACCABCABDwiyxiwwAgCkHn32UUEn3nHX0FX3X1EmkGEEEGUWlHlEX320kFW0H0G3EHnUWGmlljgHRQgATywTzWjxxnABT0BDDwBzwAWgAAAABDyiV3zwznzxVn30kF330EH32lEEHU20UE0EG30EEFH333320X3330lGkWkVkGm2WgBQgSgBzzhCgCQHWgAB3wAADxTjjzywwwgTzzwBSjzjXxTwEFWEEX3GkEXnX00EEEHFV320GkGEkE3332X231WFHX23lWE202n1TiwCxAizzywyABSwlFkTzACgABDwTzjzzDjTzyABASTnzw31EEEEGH333301X32UEE0FX1X220EEFX331kH3kEG33HX21EVX30GmnhSjwijzzzzWwD3kEC0zygCwgDyBTTzTwCgTjyAAAR0T33330EEEFX333n332X32kEEFn3333W0kFX3X303333320HX10FG1WkUHW0CRASjTzzxzgkAylX3GAwzwiADTxwxzziwxzyggAAEhTx0HE0EEEH33333332H2n0333nX31nmkEEX33333mFEH11X2HGWX3X22DwBwBCABTjjggADzzwFzjDDzwABTzzxTygBABTywAgEBVyQBX00EEFXm3132lE3332HH0lH0H32kEFXn3lHH32kH31302kH1X33kHzjw1SwhQTwwAAHDWDDyCAADSgBTzjxwqQxDhSTyyw0UBFT13WkEEEEHXHH30FXXkEUFUk23X320kk2X2lUEVGkFX31X2EH12F30HyDzyDyBzzyCAEIHwABwAABxzwBzwADyDzyAADzz3zz2EB3yB2F0EH0H30H30EEEH30F3333333332F32H11330F333313/xAAUEQEAAAAAAAAAAAAAAAAAAADA/9oACAEDAQE/EETn/8QAFBEBAAAAAAAAAAAAAAAAAAAAwP/aAAgBAgEBPxBE5//EACAQAQACAwADAQEBAQAAAAAAAAEgMAAQQBFBUDFgIXD/2gAIAQEAAT8QJlTj+Y4/u3TjS1e9kGTs0wZMHH906NuyHvkIOFLjhx+pNBJw4mTjyMWLpxpdlhpk6KfcWt4yRni926NeuF247YnSRaStxw06cZNDp0WmmBpgaY+4Oyt5fEmx14k7LXbBxkTYPC8js268QaDhNGNJxGvFhp01ueL/AFpp8cvvH4Jp42Btx054j4zxNoJmGmg0wSbnjfjAz38E/OLxHxnjiMMbmZs2yMeg5X9p8UumzxQz8Z40/N9SeRmcJp5W5h6qIO/fC9PjPGeO8x4PWjPF7aaOD12tLpxx/OdtaC7xWfBcYeYlJ8Q4krcYE3POPebKiTLxJ+iYUHO3Frs269aJNBBm85suIsPdTjzE2lxpOcm9Jph40zI+KHHTJudnOcTDxnjp91PwyLW6CwqMKDHEk40ONZE20sT8kdbQR8WNL3+KjlIeM8QdkDTo0x9444zcYFp3OjiYsDXjHleQh6iYVlzMn4zxs0RYsn9oet29DLxQ/BaTfjPGFbA5GsoJmnbB0xdMXHR8RpNF7YcbW8XvrKiToh42UuOMnGLjBx+qRfmmy14W05StodO3HRwlBjzeIuMPVjhPzs6zRMg1O2DyHwnHXuJB5nob2XvgMbfW2ZEmYzdv2XHHgetz1yF3jG84GgwgY4SfomjicYNbogfOYG2l5zbskWPEc5Mv8bduOmo2/O8UlDf66SxmdTnqZ+xNGys2wcYNTwePiNxpr9cRhjyFTv3we+IwucduOOnGg09Rp7jXm128phnjHZouN+J+8eU2aKTDPOio27cdtJBoOVrJHCc5JgadGH5JofimzRI2QaHTtxoPiuz5Hiw4i1teguJsXbpx0yON5Sp73kPzs8beDxv1yGibQwcZGG/Oio+AWF7Nib8Qayk+M0lZS0O3HGZp2VHGyLXXnDpecqKzg9Z4vdFhtq8YyccZG3hb2RazOFzzE4zja3ic8Umygj6odO3TjjI434LpgaOB6jqKHndFRhcx96cZFnib2+ZOPK2+8eU14vOHx8hh7x240NjokaZMzHZa48RjJ+I7IfsDg9c7xsnTjQ8Ls02EPfIcT3vC6KH6KbZNDT6h5g8J+TeEvMdPL7qeIpe55XGTj1FfjPGvG/HA3lLx+oHadx1OOOmL8b3xsHv855+m9jIsNOeM8Sc8b8WsvWmk150cbye6ytpaHlZvC0kGBtxqdOveOP5jSRIMvWedFHrRzvK9ja/CZOEvcnidMWkiVvx3Rexf40uOJ7nH4zwEPOHQfUeA4mDps8wKWfqBI5mBWwfonzDXihm4ycfsE2BV508J8I5zgIPG4wcc80OyL+fEdkjHTwOnZxeoev5dg440PwDiZNRpg6cNFZB4nb9DzowxeVg444x8554m5g1PwDgOFwoaT5BzuOvVHjPEDHRy+OA0cLQ8r0OyD1v5xnG4ljsx5/OvFxMtafHG1PH65nRS40OeolrBxx+i0GOvHyfXW8JU2OMvPQ449xcxfyDwNbp0/MfhFpc0unlOd4nnPhPxzbW8bNxxxpfnlnng9Ya89Be8jwnO1+ccde+8rPreu1v9xed5XbpqbfGeKGZxlze6L34bwPaVtTDzSUOzhaXT8AveIxiVvW6PitpnjHDnf2bo4Wx364PdBpmUP0Sg0WO3TB01HSb9dTnrR8I4XoP2osbCRQ6dOnHGRyGeLPcPdzF23ON/nZEvdPxyhk1lrjQcDxEniMb2n3Y8Djp6iBwtJoww4mgpMe8gcZU0vSbZnN5sNOzTIgYaMNE3Gt5mbs4jtYH8m41lTyF3uLQfadljLzFzz8svK2DJo8fHYFZB/rXPNBtxx2zamh+D4z8veZ62T8stMMLWj1t/byDecB2PwH4zIkUEjDDCbNpcfgnAafjHP443mMeFw0QIsXTS48rYfXO1+eycdGGGjCpxxk/He8w+k6dlDMmVlxjjo2WOOMW95Hqfhe6j4p8AgQO1i4XMG95jb8F73gOM0aNHJ7xmXmmT2++x/gzjNmGiBWzMduikpeVsY+rCD8J4WkkUFZYYaL3bye6HCspdtD0GMmxtaGt5PNBI0aNEDZH1d7qYvExNPe47MeP1Ni6ItnubzF5QYaDPVnrTD3jtqMeYiQO5x6XGk08L88ww5GDd6oIEX4LI4H47JqKy8kaNkfc3lZFj9p0fKdDZ706LDThEz3o2RampoNvC0HwjgeY24aJNJyF5UYZ7pdO3GTS7NPC6eZ4Tbe1NZY8bJ7Sj1Bx2zd+qHbj9x0TZNJj0eKGBWy9WHS7Ztzjo4vX2HZM+A8he7OF0y9xbWw6fXabcMOwxsZuPAcxwOmPuDwme+4k/RLHhcc8/5jWVFBA+8y9VHwWfrjdNDc7cecm6OR/YMDb0NJtiUlLzujbJw/iy8qTTB7Wb9842bNpPgHW/EeR5iD8Bg8TjUdRhQcD8F6XR0OnDGD3OF7U9Ze6YtrxuHC/JdvynTwu/fY1umTQ7eN5Ss6H5TF2/GJuitxk3knlKik37uJeMaX4zzlfqJsh6sde8dO3pa3iLS0k4xYPQcLL33migibdun4b8Mz30NbYbanbFxpfiNjFoYsGLtl6iVNh85n57Goi8pyNrFreJ+Uweo6HgaSTsgcLjj2+9PY8LUYTeH1QYSKGLpg/NPylx4W1xxreBoLnp9ycZmvUDTJ6SJ0lTjSc7cYcHqJa0PO/NZl5yPCweFmxb3hajbxP7cRa2HjlImFB2PKY8jUcbjM6HGooaDPfcfAYlzSOeZND0Hy2J2uNx0kiDJ63DXmHnG1qON4XZW979di7elkaeX1ysXGt/bn4DWxbTueRb2rzhjEiwItrFrf4duY+rnG4i0lbIh5kbdnO9LA+kdbUweox63RwsRzzY3uyZwNLFx+22GMTbDxSQOx15oKWLUzdnQ1Geo+6SB1Mn8vaDGbts9fx5adxScTxPE9Zf7+WTKHRytxR5w0aafEnhbPMmzxhyeuMk95aQc9RdFZf72wNuOFTt5STAx43k9Rc8fC9dDY49rYZ7k4/m3GptIMvPC9bzFrs4TTS9Do4WBoi1unhYv1/W35jzHWSNG3TjpoMdMXuOPzJ+C/HKnkeEk446an+DYvxDpNPy3Ch09DU8x0vyT86GZA7CJS3Pyjqdmn4frne5mUlLZ600PQz82tTJ14w09jpj6k3HzSBS3NxB/wCPm/cXGBS8XngZePgvGdBwtpIqINhhpi442PExY+eXznmjxrx9f3zsy84TDBm6eli4fDKW52/bexrKHHHGTF4XHCh356Cw4z7bo+AaNm3HGtx/Odg9LhhYcDJs8dDx+9kDj/aTDDThFh7+aXtL2rWzYnySXukpNEnHGhk/QdOiJ3OPS79yez10f//Z") center/cover fixed}
+button{font:inherit;cursor:pointer}
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:100vh}
+
+/* sidebar */
+aside{position:sticky;top:0;height:100vh;overflow-y:auto;padding:30px 18px 20px;border-right:1px solid var(--line);
+  background:rgba(250,246,244,.28);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;flex-direction:column;gap:22px}
+.logo{font-family:var(--serif);font-size:40px;letter-spacing:12px;font-weight:500;line-height:1;padding-left:6px}
+.logo small{display:block;font-size:11px;letter-spacing:4px;color:var(--muted);margin-top:10px;font-weight:600}
+.logo .rule{width:34px;height:1px;background:var(--ink2);margin:14px 0 0}
+.navt{font-family:var(--serif);font-size:12px;letter-spacing:3px;color:var(--muted);font-weight:600;margin:0 0 6px 8px}
+nav{display:flex;flex-direction:column;gap:2px}
+nav button{display:flex;justify-content:space-between;align-items:center;background:none;border:0;color:var(--ink2);
+  padding:9px 10px;border-radius:8px;font-size:14px;text-align:left;width:100%}
+nav button:hover{background:rgba(255,255,255,.35)}
+nav button.on{background:var(--dark);color:#f6f1ef}
+nav button .c{font-family:var(--serif);font-size:15px;opacity:.75}
+.side-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.btn{border:1px solid var(--ink2);background:transparent;color:var(--ink);padding:10px 14px;border-radius:999px;font-size:14px;letter-spacing:1px}
+.btn:hover{background:rgba(255,255,255,.4)}
+.btn.dark{background:var(--dark);border-color:var(--dark);color:#f6f1ef}
+.btn.dark:hover{background:#000}
+.sync{font-size:12px;color:var(--muted);line-height:1.6;padding:0 4px}
+.sync b{color:var(--ink2);font-weight:500}
+.sync .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:#9a908e}
+.sync.on .dot{background:var(--ok)}
+.sync a{color:var(--ink2);cursor:pointer;text-decoration:underline}
+
+/* main */
+main{padding:26px 26px 50px;min-width:0}
+.topbar{display:none}
+.title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.title h2{font-family:var(--serif);font-weight:500;font-size:26px;letter-spacing:4px;margin:0}
+.title span{font-size:12px;letter-spacing:3px;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.stat b{display:block;font-family:var(--serif);font-size:38px;font-weight:500;line-height:1}
+.stat small{color:var(--muted);letter-spacing:2px}
+.stat.hot b{color:var(--late)}
+.toolbar{margin:14px 0 18px;display:flex;flex-wrap:wrap;gap:8px}
+input,select,textarea{font:inherit;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:14px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink2)}
 .toolbar input{flex:1 1 200px;width:auto}.toolbar select{flex:0 1 160px;width:auto}
-.board{max-width:1500px;margin:14px auto 40px;padding:0 16px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:12px;overflow-x:auto;padding-bottom:12px}
-.col{background:var(--panel);border:1px solid var(--line);border-radius:16px;min-height:200px;display:flex;flex-direction:column}
-.col.over{border-color:var(--pink);box-shadow:0 0 0 2px rgba(255,46,136,.25) inset}
-.colhead{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);font-weight:900}
-.colhead .n{font-family:Anton,sans-serif;color:var(--muted);font-weight:400}
-.colhead .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--c)}
-.cards{padding:10px;display:flex;flex-direction:column;gap:10px;flex:1}
-.empty{color:var(--muted);font-size:13px;text-align:center;padding:18px 0;border:1px dashed var(--line);border-radius:12px}
-.card{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:grab;transition:transform .1s}
-.card:hover{border-color:#44444f;transform:translateY(-1px)}
+
+.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}
+.board.single{grid-template-columns:minmax(0,1fr)}
+.board.single .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:16px;min-width:0;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);scroll-margin-top:16px}
+.col.over{border-color:var(--ink);box-shadow:0 0 0 2px rgba(42,37,37,.15) inset}
+.colhead{padding:13px 16px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line)}
+.colhead .nm{font-weight:500;letter-spacing:3px}
+.colhead .en{font-family:var(--serif);font-size:12px;letter-spacing:3px;color:var(--muted);margin-left:8px}
+.colhead .n{font-family:var(--serif);font-size:20px;color:var(--ink2)}
+.cards{padding:12px;display:flex;flex-direction:column;gap:12px;min-height:90px}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:20px 0;border:1px dashed var(--line);border-radius:12px;letter-spacing:1px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:grab;transition:transform .12s, box-shadow .12s;min-width:0}
+.card:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(42,37,37,.08)}
 .card.dragging{opacity:.4}
-.card img{width:100%;height:150px;object-fit:cover;display:block;background:#000}
-.cbody{padding:10px 12px}
-.ctitle{font-weight:900;font-size:15px;margin:0 0 6px}
-.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
-.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#2a2a32;color:#d8d8e0}
-.tag.p-high{background:var(--pink);color:#fff}.tag.p-mid{background:#3a2a10;color:var(--amber)}
-.due{font-size:12px;color:var(--muted);font-weight:500}
-.due.late{color:var(--red);font-weight:700}.due.soon{color:var(--amber);font-weight:700}
+.card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#ddd5d3}
+.cbody{padding:11px 13px}
+.ctitle{font-weight:500;font-size:15px;margin:0 0 7px;word-break:break-word}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+.tag{font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink2);letter-spacing:1px}
+.tag.p-high{background:var(--dark);color:#f6f1ef;border-color:var(--dark)}
+.meta{font-size:12px;color:var(--muted);word-break:break-word}
+.due{font-size:12px;color:var(--muted)}
+.due.late{color:var(--late);font-weight:700}.due.soon{color:var(--soon);font-weight:700}
 .cfoot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:6px}
 .move{display:flex;gap:4px}
-.move button{padding:3px 9px;font-size:12px}
-.prog{height:4px;background:#2a2a32}
-.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--pink),var(--lime))}
-dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:18px;padding:0;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
-dialog::backdrop{background:rgba(0,0,0,.7)}
-.dhead{padding:16px 18px;border-bottom:1px solid var(--line);font-family:Anton,"Noto Sans TC",sans-serif;font-size:22px;letter-spacing:.5px}
-form .grid{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:700}
+.move button{border:1px solid var(--line);background:transparent;color:var(--ink2);padding:2px 9px;border-radius:999px;font-size:12px}
+.move button:hover{background:#fff}
+
+/* dialog */
+dialog{background:#f4efed;color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 32px)}
+dialog::backdrop{background:rgba(42,37,37,.4)}
+.dhead{padding:18px 20px;border-bottom:1px solid var(--line);font-family:var(--serif);font-size:24px;letter-spacing:4px}
+.dgrid{padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);letter-spacing:1px}
 .full{grid-column:1/-1}
-.preview{width:100%;max-height:180px;object-fit:cover;border-radius:10px;display:none}
-.dfoot{padding:12px 18px 18px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.danger{color:var(--red);border-color:#4a2026}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--lime);color:#000;font-weight:900;padding:10px 18px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+.preview{width:100%;max-height:200px;object-fit:cover;border-radius:10px;display:none}
+.dfoot{padding:12px 20px 20px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.danger{color:var(--late);border-color:var(--late)}
+.note{font-size:13px;color:var(--ink2);line-height:1.7;padding:16px 20px 0}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--dark);color:#f6f1ef;padding:10px 20px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none;z-index:99;letter-spacing:1px;font-size:14px}
 .toast.on{opacity:1}
-@media (max-width:640px){
-  .stats{grid-template-columns:repeat(2,1fr)}
-  form .grid{grid-template-columns:1fr}
-  .board{grid-auto-columns:82vw}
+.scrim{display:none}
+
+@media (max-width:1180px){ .board{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:820px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  aside{position:fixed;left:0;top:0;bottom:0;width:250px;z-index:50;transform:translateX(-100%);transition:transform .25s;background:rgba(236,229,227,.96)}
+  aside.open{transform:none}
+  .scrim.open{display:block;position:fixed;inset:0;background:rgba(42,37,37,.3);z-index:40}
+  main{padding:14px 16px 40px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .topbar .mlogo{font-family:var(--serif);font-size:28px;letter-spacing:9px;font-weight:500}
+  .iconbtn{border:1px solid var(--ink2);background:transparent;border-radius:10px;padding:7px 11px;font-size:16px;color:var(--ink)}
+  .title{display:none}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .board{grid-template-columns:minmax(0,1fr)}
+  .board.single .cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .dgrid{grid-template-columns:1fr}
+  .toolbar select{flex:1 1 0}
 }
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <h1>DESIGN <span>TRACKER</span></h1>
-    <div class="sub">服飾設計進度表 · 從靈感到上架</div>
-  </div>
-  <div class="actions">
-    <button class="primary" id="addBtn">＋ 新增款式</button>
-    <button id="exportBtn">匯出備份</button>
-    <button id="importBtn">匯入備份</button>
-    <input type="file" id="importFile" accept=".json" hidden>
-  </div>
-</header>
+<div class="layout">
+  <aside id="side">
+    <div class="logo">QUAL<small>DESIGN PROGRESS</small><div class="rule"></div></div>
+    <div>
+      <p class="navt">目錄</p>
+      <nav id="navStages"></nav>
+    </div>
+    <div>
+      <p class="navt">快速篩選</p>
+      <nav id="navQuick"></nav>
+    </div>
+    <div id="seriesBox">
+      <p class="navt">系列</p>
+      <nav id="navSeries"></nav>
+    </div>
+    <div class="side-actions">
+      <button class="btn dark" id="addBtn">＋ 新增款式</button>
+      <button class="btn" id="xlsBtn">下載 Excel</button>
+      <div class="sync" id="sync"></div>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
 
-<section class="stats">
-  <div class="stat"><b id="sTotal">0</b><small>全部款式</small></div>
-  <div class="stat go"><b id="sDoing">0</b><small>進行中</small></div>
-  <div class="stat hot"><b id="sLate">0</b><small>已逾期</small></div>
-  <div class="stat done"><b id="sDone">0</b><small>已上架</small></div>
-</section>
+  <main>
+    <div class="topbar">
+      <button class="iconbtn" id="menuBtn" aria-label="目錄">☰</button>
+      <div class="mlogo">QUAL</div>
+      <button class="iconbtn" id="addBtn2" aria-label="新增">＋</button>
+    </div>
+    <div class="title"><h2 id="viewTitle">全部進度</h2><span>服飾設計進度表 · 從靈感到上架</span></div>
 
-<div class="toolbar">
-  <input id="q" placeholder="搜尋款名、布料、備註…">
-  <select id="fSeries"><option value="">全部系列</option></select>
-  <select id="fPri"><option value="">全部優先度</option><option value="high">急件</option><option value="mid">一般</option><option value="low">不急</option></select>
+    <section class="stats">
+      <div class="stat"><b id="sTotal">0</b><small>全部款式</small></div>
+      <div class="stat"><b id="sDoing">0</b><small>進行中</small></div>
+      <div class="stat hot"><b id="sLate">0</b><small>已逾期</small></div>
+      <div class="stat"><b id="sDone">0</b><small>已上架</small></div>
+    </section>
+
+    <div class="toolbar">
+      <input id="q" placeholder="搜尋款名、布料、備註…">
+      <select id="fSeries"><option value="">全部系列</option></select>
+      <select id="fPri"><option value="">全部優先度</option><option value="high">急件</option><option value="mid">一般</option><option value="low">不急</option></select>
+    </div>
+
+    <div class="board" id="board"></div>
+  </main>
 </div>
 
-<main class="board" id="board"></main>
-
 <dialog id="dlg">
-  <form method="dialog" id="form">
+  <form id="form">
     <div class="dhead" id="dTitle">新增款式</div>
-    <div class="grid">
-      <label class="full">款式名稱 *<input name="name" required placeholder="例：鏤空綁帶短版背心"></label>
-      <label>系列<input name="series" list="seriesList" placeholder="例：2026 冬季"></label>
+    <div class="dgrid">
+      <label class="full">款式名稱 *<input name="name" required placeholder="例：綁帶反摺短褲"></label>
+      <label>系列<input name="series" list="seriesList" placeholder="例：2026 F/W"></label>
       <label>類別<select name="cat">
         <option>上衣</option><option>褲子</option><option>裙子</option><option>洋裝</option><option>外套</option><option>套裝</option><option>配件</option><option>其他</option>
       </select></label>
@@ -118,47 +186,60 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
       <label>優先度<select name="pri"><option value="mid">一般</option><option value="high">急件</option><option value="low">不急</option></select></label>
       <label>截止日<input type="date" name="due"></label>
       <label>負責人／工廠<input name="owner" placeholder="例：版師 小美"></label>
-      <label class="full">布料／配色<input name="fabric" placeholder="例：黑色彈性網紗＋銀色金屬扣"></label>
-      <label class="full">備註<textarea name="note" rows="3" placeholder="修改重點、尺寸問題、成本…"></textarea></label>
+      <label class="full">布料／配色<input name="fabric" placeholder="例：黑色羅紋棉＋銀色鉚釘"></label>
+      <label class="full">備註<textarea name="note" rows="3" placeholder="修改重點、尺寸、成本…"></textarea></label>
       <label class="full">款式圖（設計稿或樣衣照）<input type="file" id="imgInput" accept="image/*"></label>
       <img id="preview" class="preview full" alt="">
     </div>
     <div class="dfoot">
-      <button type="button" class="danger" id="delBtn">刪除</button>
+      <button type="button" class="btn danger" id="delBtn">刪除</button>
       <div style="display:flex;gap:8px;margin-left:auto">
-        <button type="button" id="cancelBtn">取消</button>
-        <button type="submit" class="primary">儲存</button>
+        <button type="button" class="btn" id="cancelBtn">取消</button>
+        <button type="submit" class="btn dark">儲存</button>
       </div>
     </div>
   </form>
 </dialog>
+
+<dialog id="teamDlg">
+  <form id="teamForm">
+    <div class="dhead">加入團隊</div>
+    <p class="note">輸入團隊代碼（至少 8 個字），用同一個代碼的手機和電腦會看到同一份進度、即時同步。<br>代碼請只告訴要一起用的人。</p>
+    <div class="dgrid"><label class="full">團隊代碼<input name="team" required minlength="8" placeholder="例：qual-studio-2026" autocomplete="off"></label></div>
+    <div class="dfoot"><button type="button" class="btn" id="teamCancel">稍後</button><button type="submit" class="btn dark">加入</button></div>
+  </form>
+</dialog>
+
 <datalist id="seriesList"></datalist>
 <div class="toast" id="toast"></div>
 
-<script>
-const STAGES = [
-  {k:'idea',   n:'靈感',     c:'#8a8aff'},
-  {k:'sketch', n:'設計稿',   c:'#b07bff'},
-  {k:'pattern',n:'打版',     c:'#ff7bd5'},
-  {k:'fabric', n:'選布備料', c:'#ff2e88'},
-  {k:'sample', n:'樣衣',     c:'#ff8a3d'},
-  {k:'fix',    n:'修改',     c:'#ffb020'},
-  {k:'prod',   n:'量產',     c:'#3dd6ff'},
-  {k:'live',   n:'已上架',   c:'#c6ff3d'}
-];
-const KEY = 'design-tracker-v1';
-const PRI = {high:'急件',mid:'一般',low:'不急'};
-let items = load();
-let editingId = null, pendingImg = null;
+<script type="module">
+/* ============================================================
+   同步設定：把 Firebase 給你的設定貼在這裡（貼好後所有裝置自動同步）
+   沒貼的話，進度表會以「單機模式」運作，資料只存在這台裝置。
+   ============================================================ */
+const FIREBASE_CONFIG = null;
 
-function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || [] }catch(e){ return [] } }
-function save(){
-  try{ localStorage.setItem(KEY, JSON.stringify(items)); }
-  catch(e){ toast('空間不足：請刪掉一些圖片或先匯出備份'); }
-}
-function toast(t){ const el=document.getElementById('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'),2200); }
+const STAGES = [
+  {k:'idea',   n:'靈感',   en:'IDEA'},
+  {k:'sketch', n:'設計稿', en:'SKETCH'},
+  {k:'sample', n:'打樣',   en:'SAMPLE'},
+  {k:'live',   n:'上架',   en:'LAUNCH'}
+];
+const OLD_MAP = {pattern:'sample',fabric:'sample',fix:'sample',prod:'live'};
+const PRI = {high:'急件',mid:'一般',low:'不急'};
+const LKEY = 'design-tracker-v1', TKEY = 'qual-team';
+const $ = id => document.getElementById(id);
+
+let items = [], view = 'all', editingId = null, pendingImg = null;
+let cloud = null; // {db, fs, team}
+
+/* ---------- utils ---------- */
+const ls = { get(k){ try{return localStorage.getItem(k)}catch(e){return null} }, set(k,v){ try{localStorage.setItem(k,v);return true}catch(e){return false} } };
+function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('on'),2400); }
 const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today = () => { const d=new Date(); d.setHours(0,0,0,0); return d; };
+const fixStage = it => { if(OLD_MAP[it.stage]) it.stage = OLD_MAP[it.stage]; if(!STAGES.some(s=>s.k===it.stage)) it.stage='idea'; return it; };
 function dueInfo(it){
   if(!it.due || it.stage==='live') return null;
   const days = Math.round((new Date(it.due+'T00:00:00') - today())/86400000);
@@ -167,53 +248,132 @@ function dueInfo(it){
   if(days<=3) return {cls:'soon', t:`剩 ${days} 天`};
   return {cls:'', t:`截止 ${it.due.slice(5).replace('-','/')}`};
 }
+const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
-/* render */
-const board = document.getElementById('board');
-document.getElementById('stageSel').innerHTML = STAGES.map(s=>`<option value="${s.k}">${s.n}</option>`).join('');
+/* ---------- storage layer ---------- */
+function loadLocal(){ try{ return (JSON.parse(ls.get(LKEY))||[]).map(fixStage) }catch(e){ return [] } }
+function saveLocal(){ if(!ls.set(LKEY, JSON.stringify(items))) toast('空間不足：請刪掉一些圖片'); }
+async function upsert(it){
+  it.updated = Date.now();
+  if(cloud){
+    const clean = Object.fromEntries(Object.entries(it).map(([k,v])=>[k, v===undefined?null:v]));
+    try{ await cloud.fs.setDoc(cloud.fs.doc(cloud.db,'teams',cloud.team,'items',it.id), clean); }
+    catch(e){ toast('同步失敗，請檢查網路'); console.error(e); }
+  } else {
+    const i = items.findIndex(x=>x.id===it.id);
+    if(i>=0) items[i]=it; else items.push(it);
+    saveLocal(); render();
+  }
+}
+async function removeItem(id){
+  if(cloud){ try{ await cloud.fs.deleteDoc(cloud.fs.doc(cloud.db,'teams',cloud.team,'items',id)); }catch(e){ toast('刪除失敗，請檢查網路'); } }
+  else { items = items.filter(i=>i.id!==id); saveLocal(); render(); }
+}
 
-function render(){
-  const q = document.getElementById('q').value.trim().toLowerCase();
-  const fs = document.getElementById('fSeries').value;
-  const fp = document.getElementById('fPri').value;
-  const list = items.filter(it =>
+async function startCloud(team){
+  const V='10.12.2';
+  const app = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+  const fs  = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`);
+  const fbApp = app.getApps().length ? app.getApp() : app.initializeApp(FIREBASE_CONFIG);
+  const db = fs.getFirestore(fbApp);
+  cloud = {db, fs, team};
+  let first = true;
+  fs.onSnapshot(fs.collection(db,'teams',team,'items'), snap=>{
+    items = snap.docs.map(d=>fixStage({...d.data(), id:d.id}));
+    if(first){ first=false; offerMigrate(snap.empty); }
+    syncStatus(true); render();
+  }, err=>{ console.error(err); syncStatus(false, '無法連線雲端（檢查代碼或規則）'); });
+}
+async function offerMigrate(cloudEmpty){
+  const local = loadLocal().filter(i=>!String(i.id).startsWith('demo'));
+  if(!local.length || ls.get('qual-migrated-'+cloud.team)) return;
+  if(confirm(`這台裝置上有 ${local.length} 筆舊資料，要上傳到團隊雲端嗎？`)){
+    for(const it of local) await upsert(it);
+    toast('已上傳到雲端');
+  }
+  ls.set('qual-migrated-'+cloud.team,'1');
+}
+function syncStatus(ok, msg){
+  const el=$('sync');
+  if(!FIREBASE_CONFIG){ el.className='sync'; el.innerHTML='<span class="dot"></span><b>單機模式</b><br>尚未開啟雲端同步'; return; }
+  if(!cloud){ el.className='sync'; el.innerHTML='<span class="dot"></span><b>未加入團隊</b><br><a id="joinLink">輸入團隊代碼</a>'; $('joinLink').onclick=askTeam; return; }
+  el.className = ok ? 'sync on' : 'sync';
+  el.innerHTML = `<span class="dot"></span><b>${ok?'雲端同步中':esc(msg||'連線中…')}</b><br>團隊：${esc(cloud.team)} · <a id="switchLink">切換</a>`;
+  $('switchLink').onclick = ()=>{ if(confirm('要換到別的團隊代碼嗎？')){ try{localStorage.removeItem(TKEY)}catch(e){} location.reload(); } };
+}
+function askTeam(){ $('teamDlg').showModal(); }
+$('teamCancel').onclick = ()=>$('teamDlg').close();
+$('teamForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  const t = new FormData(e.target).get('team').trim();
+  if(t.length<8) return toast('代碼至少 8 個字');
+  ls.set(TKEY, t); $('teamDlg').close(); syncStatus(false,'連線中…'); startCloud(t).catch(err=>{console.error(err); syncStatus(false,'雲端載入失敗');});
+});
+
+/* ---------- render ---------- */
+$('stageSel').innerHTML = STAGES.map(s=>`<option value="${s.k}">${s.n}</option>`).join('');
+
+function filtered(){
+  const q = $('q').value.trim().toLowerCase(), fs = $('fSeries').value, fp = $('fPri').value;
+  return items.filter(it =>
     (!fs || it.series===fs) && (!fp || it.pri===fp) &&
-    (!q || [it.name,it.series,it.fabric,it.note,it.owner,it.cat].join(' ').toLowerCase().includes(q)));
+    (!q || [it.name,it.series,it.fabric,it.note,it.owner,it.cat].join(' ').toLowerCase().includes(q)) &&
+    (view!=='late' || dueInfo(it)?.cls==='late') &&
+    (view!=='high' || it.pri==='high'));
+}
+function render(){
+  const list = filtered();
   const order = {high:0,mid:1,low:2};
-  board.innerHTML = STAGES.map((s,i)=>{
+  const stageView = STAGES.find(s=>s.k===view);
+  const shown = stageView ? [stageView] : STAGES;
+  $('board').className = 'board' + (stageView ? ' single' : '');
+  $('board').innerHTML = shown.map(s=>{
+    const idx = STAGES.indexOf(s);
     const cards = list.filter(it=>it.stage===s.k)
       .sort((a,b)=>(order[a.pri]-order[b.pri]) || ((a.due||'9')>(b.due||'9')?1:-1));
-    return `<section class="col" data-stage="${s.k}">
-      <div class="colhead"><span><span class="dot" style="--c:${s.c}"></span>${s.n}</span><span class="n">${cards.length}</span></div>
-      <div class="cards">${cards.length? cards.map(it=>card(it,i)).join('') : '<div class="empty">拖曳款式到這裡</div>'}</div>
+    return `<section class="col" id="col-${s.k}" data-stage="${s.k}">
+      <div class="colhead"><span><span class="nm">${s.n}</span><span class="en">${s.en}</span></span><span class="n">${cards.length}</span></div>
+      <div class="cards">${cards.length? cards.map(it=>card(it,idx)).join('') : '<div class="empty">把款式拖到這裡</div>'}</div>
     </section>`;
   }).join('');
-  // stats
-  document.getElementById('sTotal').textContent = items.length;
-  document.getElementById('sDone').textContent = items.filter(i=>i.stage==='live').length;
-  document.getElementById('sDoing').textContent = items.filter(i=>i.stage!=='live' && i.stage!=='idea').length;
-  document.getElementById('sLate').textContent = items.filter(i=>dueInfo(i)?.cls==='late').length;
-  // series filter
+
+  $('sTotal').textContent = items.length;
+  $('sDone').textContent  = items.filter(i=>i.stage==='live').length;
+  $('sDoing').textContent = items.filter(i=>i.stage==='sketch'||i.stage==='sample').length;
+  $('sLate').textContent  = items.filter(i=>dueInfo(i)?.cls==='late').length;
+
+  const titles = {all:'全部進度', late:'已逾期', high:'急件'};
+  $('viewTitle').textContent = stageView ? stageView.n : titles[view];
+
+  // sidebar
+  const cnt = k => items.filter(i=>i.stage===k).length;
+  $('navStages').innerHTML =
+    `<button data-view="all" class="${view==='all'?'on':''}"><span>全部進度</span><span class="c">${items.length}</span></button>` +
+    STAGES.map(s=>`<button data-view="${s.k}" class="${view===s.k?'on':''}"><span>${s.n}</span><span class="c">${cnt(s.k)}</span></button>`).join('');
+  $('navQuick').innerHTML =
+    `<button data-view="late" class="${view==='late'?'on':''}"><span>已逾期</span><span class="c">${items.filter(i=>dueInfo(i)?.cls==='late').length}</span></button>` +
+    `<button data-view="high" class="${view==='high'?'on':''}"><span>急件</span><span class="c">${items.filter(i=>i.pri==='high').length}</span></button>`;
+
   const series = [...new Set(items.map(i=>i.series).filter(Boolean))].sort();
-  const sel = document.getElementById('fSeries');
-  sel.innerHTML = '<option value="">全部系列</option>' + series.map(s=>`<option ${s===fs?'selected':''}>${esc(s)}</option>`).join('');
-  document.getElementById('seriesList').innerHTML = series.map(s=>`<option value="${esc(s)}">`).join('');
+  const fsVal = $('fSeries').value;
+  $('fSeries').innerHTML = '<option value="">全部系列</option>' + series.map(s=>`<option ${s===fsVal?'selected':''}>${esc(s)}</option>`).join('');
+  $('seriesList').innerHTML = series.map(s=>`<option value="${esc(s)}">`).join('');
+  $('seriesBox').style.display = series.length ? '' : 'none';
+  $('navSeries').innerHTML = series.map(s=>`<button data-series="${esc(s)}" class="${s===fsVal?'on':''}"><span>${esc(s)}</span><span class="c">${items.filter(i=>i.series===s).length}</span></button>`).join('');
 }
 function card(it, idx){
   const d = dueInfo(it);
-  const pct = Math.round((idx+1)/STAGES.length*100);
-  return `<article class="card" draggable="true" data-id="${it.id}">
-    ${it.img?`<img src="${it.img}" alt="">`:''}
-    <div class="prog"><i style="width:${pct}%"></i></div>
+  return `<article class="card" draggable="true" data-id="${esc(it.id)}">
+    ${it.img?`<img src="${it.img}" alt="" loading="lazy">`:''}
     <div class="cbody">
       <p class="ctitle">${esc(it.name)}</p>
       <div class="tags">
-        ${it.pri!=='low'?`<span class="tag p-${it.pri}">${PRI[it.pri]}</span>`:''}
+        ${it.pri==='high'?`<span class="tag p-high">急件</span>`:''}
         <span class="tag">${esc(it.cat)}</span>
         ${it.series?`<span class="tag">${esc(it.series)}</span>`:''}
       </div>
-      ${it.fabric?`<div class="due">🧵 ${esc(it.fabric)}</div>`:''}
-      ${it.owner?`<div class="due">👤 ${esc(it.owner)}</div>`:''}
+      ${it.fabric?`<div class="meta">布料　${esc(it.fabric)}</div>`:''}
+      ${it.owner?`<div class="meta">負責　${esc(it.owner)}</div>`:''}
       <div class="cfoot">
         <span class="due ${d?.cls||''}">${d?d.t:''}</span>
         <span class="move">
@@ -225,103 +385,111 @@ function card(it, idx){
   </article>`;
 }
 
-/* interactions */
-board.addEventListener('click', e=>{
+/* ---------- sidebar & mobile ---------- */
+function closeSide(){ $('side').classList.remove('open'); $('scrim').classList.remove('open'); }
+$('menuBtn').onclick = ()=>{ $('side').classList.add('open'); $('scrim').classList.add('open'); };
+$('scrim').onclick = closeSide;
+$('side').addEventListener('click', e=>{
+  const v = e.target.closest('[data-view]'); const s = e.target.closest('[data-series]');
+  if(v){ view = v.dataset.view; render(); closeSide(); window.scrollTo({top:0,behavior:'smooth'}); }
+  if(s){ $('fSeries').value = $('fSeries').value===s.dataset.series ? '' : s.dataset.series; render(); closeSide(); }
+});
+
+/* ---------- board interactions ---------- */
+function moveTo(it, stage){
+  if(it.stage===stage) return;
+  const n = {...it, stage}; upsert(n);
+  if(stage==='live') toast(`${it.name} 上架了`);
+}
+$('board').addEventListener('click', e=>{
   const c = e.target.closest('.card'); if(!c) return;
-  const it = items.find(i=>i.id===c.dataset.id);
+  const it = items.find(i=>i.id===c.dataset.id); if(!it) return;
   const mv = e.target.closest('[data-mv]');
-  if(mv){
-    const i = STAGES.findIndex(s=>s.k===it.stage) + Number(mv.dataset.mv);
-    it.stage = STAGES[i].k; it.updated = Date.now(); save(); render();
-    if(it.stage==='live') toast(`🎉 ${it.name} 上架了！`);
-    return;
-  }
+  if(mv){ const i = STAGES.findIndex(s=>s.k===it.stage) + Number(mv.dataset.mv); moveTo(it, STAGES[i].k); return; }
   openDlg(it);
 });
-board.addEventListener('dragstart', e=>{
-  const c=e.target.closest('.card'); if(!c) return;
-  e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging');
-});
-board.addEventListener('dragend', e=>e.target.closest('.card')?.classList.remove('dragging'));
-board.addEventListener('dragover', e=>{
-  const col=e.target.closest('.col'); if(!col) return;
-  e.preventDefault(); document.querySelectorAll('.col.over').forEach(x=>x!==col&&x.classList.remove('over')); col.classList.add('over');
-});
-board.addEventListener('dragleave', e=>{ const col=e.target.closest('.col'); if(col && !col.contains(e.relatedTarget)) col.classList.remove('over'); });
-board.addEventListener('drop', e=>{
+$('board').addEventListener('dragstart', e=>{ const c=e.target.closest('.card'); if(!c) return; e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); });
+$('board').addEventListener('dragend', e=>e.target.closest('.card')?.classList.remove('dragging'));
+$('board').addEventListener('dragover', e=>{ const col=e.target.closest('.col'); if(!col) return; e.preventDefault(); document.querySelectorAll('.col.over').forEach(x=>x!==col&&x.classList.remove('over')); col.classList.add('over'); });
+$('board').addEventListener('dragleave', e=>{ const col=e.target.closest('.col'); if(col && !col.contains(e.relatedTarget)) col.classList.remove('over'); });
+$('board').addEventListener('drop', e=>{
   const col=e.target.closest('.col'); if(!col) return; e.preventDefault(); col.classList.remove('over');
-  const it=items.find(i=>i.id===e.dataTransfer.getData('text/plain')); if(!it) return;
-  it.stage=col.dataset.stage; it.updated=Date.now(); save(); render();
-  if(it.stage==='live') toast(`🎉 ${it.name} 上架了！`);
+  const it=items.find(i=>i.id===e.dataTransfer.getData('text/plain')); if(it) moveTo(it, col.dataset.stage);
 });
-['q','fSeries','fPri'].forEach(id=>document.getElementById(id).addEventListener('input', render));
+['q','fSeries','fPri'].forEach(id=>$(id).addEventListener('input', render));
 
-/* dialog */
-const dlg=document.getElementById('dlg'), form=document.getElementById('form'), preview=document.getElementById('preview');
+/* ---------- dialog ---------- */
+const dlg=$('dlg'), form=$('form'), preview=$('preview');
 function openDlg(it){
   editingId = it?.id || null; pendingImg = it?.img || null;
   form.reset();
-  document.getElementById('dTitle').textContent = it ? '編輯款式' : '新增款式';
-  document.getElementById('delBtn').style.visibility = it ? 'visible' : 'hidden';
-  const v = it || {stage:'idea', pri:'mid', cat:'上衣'};
+  $('dTitle').textContent = it ? '編輯款式' : '新增款式';
+  $('delBtn').style.visibility = it ? 'visible' : 'hidden';
+  const v = it || {stage: STAGES.some(s=>s.k===view)?view:'idea', pri:'mid', cat:'上衣', series:$('fSeries').value};
   for(const k of ['name','series','cat','stage','pri','due','owner','fabric','note']) form.elements[k].value = v[k] || '';
   preview.style.display = pendingImg ? 'block' : 'none'; preview.src = pendingImg || '';
-  dlg.showModal();
+  closeSide(); dlg.showModal();
 }
-document.getElementById('addBtn').onclick = ()=>openDlg(null);
-document.getElementById('cancelBtn').onclick = ()=>dlg.close();
-document.getElementById('delBtn').onclick = ()=>{
-  if(!confirm('確定刪除這個款式？')) return;
-  items = items.filter(i=>i.id!==editingId); save(); render(); dlg.close();
-};
+$('addBtn').onclick = ()=>openDlg(null);
+$('addBtn2').onclick = ()=>openDlg(null);
+$('cancelBtn').onclick = ()=>dlg.close();
+$('delBtn').onclick = ()=>{ if(!confirm('確定刪除這個款式？')) return; removeItem(editingId); dlg.close(); };
 form.addEventListener('submit', e=>{
   e.preventDefault();
   const data = Object.fromEntries(new FormData(form).entries());
-  data.img = pendingImg; data.updated = Date.now();
-  if(editingId) Object.assign(items.find(i=>i.id===editingId), data);
-  else items.push({id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), created: Date.now(), ...data});
-  save(); render(); dlg.close(); toast('已儲存 ✓');
+  const base = editingId ? items.find(i=>i.id===editingId) : {id:newId(), created:Date.now()};
+  upsert({...base, ...data, img: pendingImg || null});
+  dlg.close(); toast('已儲存');
 });
-document.getElementById('imgInput').addEventListener('change', e=>{
+$('imgInput').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
   r.onload=()=>{ const im=new Image(); im.onload=()=>{
-    const s=Math.min(1, 600/Math.max(im.width,im.height)); const cv=document.createElement('canvas');
-    cv.width=im.width*s; cv.height=im.height*s; cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+    const s=Math.min(1, 640/Math.max(im.width,im.height)); const cv=document.createElement('canvas');
+    cv.width=Math.round(im.width*s); cv.height=Math.round(im.height*s); cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
     pendingImg = cv.toDataURL('image/jpeg',.72); preview.src=pendingImg; preview.style.display='block';
   }; im.src=r.result; };
   r.readAsDataURL(f);
 });
 
-/* backup */
-document.getElementById('exportBtn').onclick = ()=>{
-  const blob = new Blob([JSON.stringify(items,null,2)],{type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = `設計進度備份-${new Date().toISOString().slice(0,10)}.json`; a.click();
-  toast('備份已下載');
-};
-document.getElementById('importBtn').onclick = ()=>document.getElementById('importFile').click();
-document.getElementById('importFile').addEventListener('change', e=>{
-  const f=e.target.files[0]; if(!f) return;
-  f.text().then(t=>{
-    try{ const d=JSON.parse(t); if(!Array.isArray(d)) throw 0;
-      if(!confirm(`要用備份裡的 ${d.length} 個款式取代目前資料嗎？`)) return;
-      items=d; save(); render(); toast('匯入完成');
-    }catch(_){ toast('檔案格式不對'); }
+/* ---------- Excel ---------- */
+$('xlsBtn').onclick = ()=>{
+  if(!window.XLSX) return toast('Excel 元件還在載入，請稍候再試');
+  const fmt = t => t ? new Date(t).toLocaleDateString('zh-TW') : '';
+  const sn = k => STAGES.find(s=>s.k===k)?.n || k;
+  const rows = [...items].sort((a,b)=>STAGES.findIndex(s=>s.k===a.stage)-STAGES.findIndex(s=>s.k===b.stage))
+    .map(it=>({'款式名稱':it.name,'系列':it.series||'','類別':it.cat||'','階段':sn(it.stage),'優先度':PRI[it.pri]||'',
+      '截止日':it.due||'','狀態':dueInfo(it)?.t||'','負責人／工廠':it.owner||'','布料／配色':it.fabric||'','備註':it.note||'',
+      '建立日期':fmt(it.created),'最後更新':fmt(it.updated)}));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows.length?rows:[{'款式名稱':''}]);
+  ws['!cols'] = [24,14,8,8,8,12,12,16,24,36,12,12].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, '全部款式');
+  STAGES.forEach(s=>{
+    const r = rows.filter(x=>x['階段']===s.n);
+    if(r.length){ const w=XLSX.utils.json_to_sheet(r); w['!cols']=ws['!cols']; XLSX.utils.book_append_sheet(wb, w, s.n); }
   });
-  e.target.value='';
-});
+  XLSX.writeFile(wb, `QUAL設計進度-${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Excel 已下載');
+};
 
-/* first-time sample */
-if(!items.length){
-  const in5 = new Date(Date.now()+5*864e5).toISOString().slice(0,10);
-  items = [
-    {id:'demo1',name:'鏤空綁帶短版背心',series:'範例系列',cat:'上衣',stage:'sample',pri:'high',due:in5,owner:'版師',fabric:'黑色彈性網紗',note:'這是範例，可以刪掉',img:null},
-    {id:'demo2',name:'皮革低腰工裝褲',series:'範例系列',cat:'褲子',stage:'sketch',pri:'mid',due:'',owner:'',fabric:'仿皮＋銀扣',note:'',img:null}
-  ];
-  save();
+/* ---------- start ---------- */
+if(FIREBASE_CONFIG){
+  const t = ls.get(TKEY);
+  if(t){ syncStatus(false,'連線中…'); startCloud(t).catch(err=>{console.error(err); syncStatus(false,'雲端載入失敗');}); }
+  else { syncStatus(false); askTeam(); }
+  render();
+} else {
+  items = loadLocal();
+  if(!items.length){
+    const in5 = new Date(Date.now()+5*864e5).toISOString().slice(0,10);
+    items = [
+      {id:'demo1',name:'綁帶反摺短褲',series:'2026 F/W',cat:'褲子',stage:'sample',pri:'high',due:in5,owner:'版師',fabric:'黑色羅紋棉＋銀色鉚釘',note:'範例，可刪除',img:null},
+      {id:'demo2',name:'草寫 Logo 腰頭',series:'2026 F/W',cat:'配件',stage:'sketch',pri:'mid',due:'',owner:'',fabric:'灰色印字',note:'',img:null}
+    ];
+  }
+  saveLocal(); syncStatus(); render();
 }
-render();
 </script>
 </body>
 </html>
