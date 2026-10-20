@@ -218,7 +218,14 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
    同步設定：把 Firebase 給你的設定貼在這裡（貼好後所有裝置自動同步）
    沒貼的話，進度表會以「單機模式」運作，資料只存在這台裝置。
    ============================================================ */
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCZR68TejLtHS_gjvAyXshwoban1hUrmt0",
+  authDomain: "qual-acd88.firebaseapp.com",
+  projectId: "qual-acd88",
+  storageBucket: "qual-acd88.firebasestorage.app",
+  messagingSenderId: "409553220993",
+  appId: "1:409553220993:web:e1865096766fb4a34e2480"
+};
 
 const STAGES = [
   {k:'idea',   n:'靈感',   en:'IDEA'},
@@ -296,7 +303,11 @@ async function offerMigrate(cloudEmpty){
 function syncStatus(ok, msg){
   const el=$('sync');
   if(!FIREBASE_CONFIG){ el.className='sync'; el.innerHTML='<span class="dot"></span><b>單機模式</b><br>尚未開啟雲端同步'; return; }
-  if(!cloud){ el.className='sync'; el.innerHTML='<span class="dot"></span><b>未加入團隊</b><br><a id="joinLink">輸入團隊代碼</a>'; $('joinLink').onclick=askTeam; return; }
+  if(!cloud){
+    const t = ls.get(TKEY);
+    if(t){ el.className='sync'; el.innerHTML=`<span class="dot"></span><b>${esc(msg||'連線中…')}</b><br>團隊：${esc(t)} · <a id="retryLink">重試</a>`; $('retryLink').onclick=()=>location.reload(); return; }
+    el.className='sync'; el.innerHTML='<span class="dot"></span><b>未加入團隊</b><br><a id="joinLink">輸入團隊代碼</a>'; $('joinLink').onclick=askTeam; return;
+  }
   el.className = ok ? 'sync on' : 'sync';
   el.innerHTML = `<span class="dot"></span><b>${ok?'雲端同步中':esc(msg||'連線中…')}</b><br>團隊：${esc(cloud.team)} · <a id="switchLink">切換</a>`;
   $('switchLink').onclick = ()=>{ if(confirm('要換到別的團隊代碼嗎？')){ try{localStorage.removeItem(TKEY)}catch(e){} location.reload(); } };
