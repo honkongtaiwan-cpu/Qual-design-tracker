@@ -269,10 +269,9 @@ const FIREBASE_CONFIG = {
 const STAGES = [
   {k:'idea',   n:'靈感',   en:'IDEA'},
   {k:'sketch', n:'設計中', en:'DESIGNING'},
-  {k:'sample', n:'打樣',   en:'SAMPLE'},
   {k:'live',   n:'上架',   en:'LAUNCH'}
 ];
-const OLD_MAP = {pattern:'sample',fabric:'sample',fix:'sample',prod:'live'};
+const OLD_MAP = {pattern:'sketch',fabric:'sketch',fix:'sketch',sample:'sketch',prod:'live'};
 const PRI = {high:'急件',mid:'一般',low:'不急'};
 const LKEY = 'design-tracker-v1', TKEY = 'qual-team';
 const $ = id => document.getElementById(id);
@@ -402,7 +401,7 @@ function render(){
     return;
   }
   // 首頁：只留上架
-  const shown = [STAGES[3]];
+  const shown = [STAGES.find(s=>s.k==='live')];
   $('board').className = 'board' + (shown.length===1 ? ' single' : '');
   $('board').innerHTML = shown.map(s=>{
     const idx = STAGES.indexOf(s);
@@ -471,7 +470,7 @@ function card(it){
       <div class="cfoot">
         <span class="due ${d?.cls||''}">${d?d.t:''}</span>
         <span class="move">
-          ${it.stage!=='live'?`<button data-mv="1" title="${it.stage==='idea'?'複製到設計中':'推到下一階段'}">▶</button>`:''}
+          ${it.stage!=='live'?`<button data-mv="1" title="上架">▶</button>`:''}
         </span>
       </div>
     </div>
@@ -509,7 +508,7 @@ $('board').addEventListener('click', e=>{
   const mv = e.target.closest('[data-mv]');
   if(mv){
     if(it.stage==='idea'){
-      openDlg(null, {stage:'sketch', ver:'v1', pri:'mid', cat:'上衣', series:$('fSeries').value, img:it.img, history:histOf(it), from:it.id});
+      openDlg(null, {stage:'sketch', ver:'v1', pri:'mid', cat:'上衣', series:$('fSeries').value, img:it.img, history: it.img ? [{img:it.img, ver:'', st:'idea', at:Date.now()}] : [], from:it.id});
       return;
     }
     const i = STAGES.findIndex(s=>s.k===it.stage) + 1; moveTo(it, STAGES[i].k); return;
@@ -533,11 +532,12 @@ const stShort = {idea:'靈感',sketch:'設計',sample:'打樣',live:'上架'};
 function fillVer(cur){
   const nums = [cur, ...pendingHist.map(h=>h.ver)].map(v=>parseInt(String(v||'').replace(/\D/g,''))||1);
   const max = Math.max(10, Math.max(...nums)+1);
-  $('verSel').innerHTML = Array.from({length:max},(_,i)=>`<option>v${i+1}</option>`).join('');
+  $('verSel').innerHTML = Array.from({length:max},(_,i)=>`<option>v${i+1}</option>`).join('') + '<option>Final</option>';
   $('verSel').value = cur || 'v1';
 }
+let selIdx = null;
 function renderThumbs(){
-  $('thumbs').innerHTML = pendingHist.map((h,i)=>`<div class="thumb ${h.img===pendingImg?'on':''}" data-i="${i}">
+  $('thumbs').innerHTML = pendingHist.map((h,i)=>`<div class="thumb ${(selIdx!==null?i===selIdx:h.img===pendingImg)?'on':''}" data-i="${i}">
       <img src="${h.img}" alt=""><span class="lb">${h.st==='idea'?'參考':`${esc(stShort[h.st]||'')} ${esc(h.ver||'')}`}</span>
       <button type="button" class="x" data-del="${i}" title="刪除這張">×</button></div>`).join('');
   const st = form.elements.stage.value;
@@ -564,7 +564,7 @@ let pendingFrom = null;
 function openDlg(it, draft){
   if(!it && !draft && view==='idea'){ uplStage='idea'; $('uplInput').click(); return; }
   editingId = it?.id || null; pendingFrom = draft?.from || null;
-  pendingImg = it?.img || draft?.img || null; pendingHist = it ? histOf(it) : (draft?.history||[]);
+  pendingImg = it?.img || draft?.img || null; selIdx = null; pendingHist = it ? histOf(it) : (draft?.history||[]);
   pendingNotes = {...(it?.notes||{})};
   if(it && !it.notes && it.note) pendingNotes[keyFor(it.stage, it.ver)] = it.note;
   form.reset();
@@ -610,20 +610,25 @@ $('imgInput').addEventListener('change', async e=>{
   try{
     pendingImg = await compress(f);
     pendingHist.push({img:pendingImg, ver:$('verSel').value||'v1', st:form.elements.stage.value, at:Date.now()});
+    selIdx = pendingHist.length-1;
     showPreview(); renderThumbs();
   }catch(_){ toast('這張圖片讀不了'); }
 });
 $('stageSel').addEventListener('change', stageUI);
-$('verSel').addEventListener('change', syncNote);
+$('verSel').addEventListener('change', ()=>{
+  const h = selIdx!==null ? pendingHist[selIdx] : null;
+  if(h && h.st!=='idea'){ h.ver = $('verSel').value; h.st = form.elements.stage.value; }
+  syncNote(); renderThumbs();
+});
 $('thumbs').addEventListener('click', e=>{
   const del = e.target.closest('[data-del]');
   if(del){
-    const [h] = pendingHist.splice(Number(del.dataset.del),1);
+    const [h] = pendingHist.splice(Number(del.dataset.del),1); selIdx = null;
     if(h && h.img===pendingImg) pendingImg = pendingHist.length ? pendingHist[pendingHist.length-1].img : null;
     showPreview(); renderThumbs(); return;
   }
   const t = e.target.closest('[data-i]'); if(!t) return;
-  pendingImg = pendingHist[Number(t.dataset.i)].img; showPreview(); renderThumbs();
+  selIdx = Number(t.dataset.i); pendingImg = pendingHist[selIdx].img; showPreview(); renderThumbs();
 });
 $('uplInput').addEventListener('change', async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
@@ -718,7 +723,7 @@ if(FIREBASE_CONFIG){
   if(!items.length){
     const in5 = new Date(Date.now()+5*864e5).toISOString().slice(0,10);
     items = [
-      {id:'demo1',name:'綁帶反摺短褲',series:'2026 F/W',cat:'褲子',stage:'sample',pri:'high',due:in5,owner:'版師',fabric:'黑色羅紋棉＋銀色鉚釘',note:'範例，可刪除',img:null},
+      {id:'demo1',name:'綁帶反摺短褲',series:'2026 F/W',cat:'褲子',stage:'sketch',pri:'high',due:in5,owner:'版師',fabric:'黑色羅紋棉＋銀色鉚釘',note:'範例，可刪除',img:null},
       {id:'demo2',name:'草寫 Logo 腰頭',series:'2026 F/W',cat:'配件',stage:'sketch',pri:'mid',due:'',owner:'',fabric:'灰色印字',note:'',img:null}
     ];
   }
