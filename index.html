@@ -80,7 +80,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink2)}
 .card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:grab;transition:transform .12s, box-shadow .12s;min-width:0}
 .card:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(42,37,37,.08)}
 .card.dragging{opacity:.4}
-.card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#ddd5d3}
+.card img{width:100%;aspect-ratio:4/3;object-fit:contain;display:block;background:rgba(255,255,255,.55)}
 .cbody{padding:11px 13px}
 .ctitle{font-weight:500;font-size:15px;margin:0 0 7px;word-break:break-word}
 .tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
@@ -101,7 +101,15 @@ dialog::backdrop{background:rgba(42,37,37,.4)}
 .dgrid{padding:16px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);letter-spacing:1px}
 .full{grid-column:1/-1}
-.preview{width:100%;max-height:200px;object-fit:cover;border-radius:10px;display:none}
+.preview{width:100%;max-height:340px;object-fit:contain;border-radius:10px;display:none;background:rgba(255,255,255,.6)}
+.hlabel{font-size:12px;color:var(--muted);letter-spacing:1px;margin-bottom:6px}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
+.thumb{position:relative;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.65);padding:0;overflow:hidden;color:var(--ink2)}
+.thumb img{width:100%;aspect-ratio:1;object-fit:contain;display:block}
+.thumb .lb{display:block;font-size:10px;line-height:1.35;color:var(--muted);padding:3px 2px 4px;text-align:center}
+.thumb.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.thumb .x{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(42,37,37,.75);color:#fff;font-size:12px;line-height:18px;text-align:center}
+.board.gallery .empty{grid-column:1/-1}
 .dfoot{padding:12px 20px 20px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .danger{color:var(--late);border-color:var(--late)}
 .note{font-size:13px;color:var(--ink2);line-height:1.7;padding:16px 20px 0}
@@ -191,11 +199,14 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
       <label>目前階段<select name="stage" id="stageSel"></select></label>
       <label>優先度<select name="pri"><option value="mid">一般</option><option value="high">急件</option><option value="low">不急</option></select></label>
       <label>截止日<input type="date" name="due"></label>
+      <label id="verWrap">版本<select name="ver" id="verSel"></select></label>
+      <label id="vdateWrap">日期<input type="date" name="vdate"></label>
       <label>負責人／工廠<input name="owner" placeholder="例：版師 小美"></label>
       <label class="full">布料／配色<input name="fabric" placeholder="例：黑色羅紋棉＋銀色鉚釘"></label>
       <label class="full">備註<textarea name="note" rows="3" placeholder="修改重點、尺寸、成本…"></textarea></label>
       <label class="full">款式圖（設計稿或樣衣照）<input type="file" id="imgInput" accept="image/*"></label>
       <img id="preview" class="preview full" alt="">
+      <div class="full" id="histWrap"><div class="hlabel">歷史圖片（由舊到新，點一下設為封面）</div><div class="thumbs" id="thumbs"></div></div>
     </div>
     <div class="dfoot">
       <button type="button" class="btn danger" id="delBtn">刪除</button>
@@ -236,7 +247,7 @@ const FIREBASE_CONFIG = {
 
 const STAGES = [
   {k:'idea',   n:'靈感',   en:'IDEA'},
-  {k:'sketch', n:'設計稿', en:'SKETCH'},
+  {k:'sketch', n:'設計中', en:'DESIGNING'},
   {k:'sample', n:'打樣',   en:'SAMPLE'},
   {k:'live',   n:'上架',   en:'LAUNCH'}
 ];
@@ -245,7 +256,7 @@ const PRI = {high:'急件',mid:'一般',low:'不急'};
 const LKEY = 'design-tracker-v1', TKEY = 'qual-team';
 const $ = id => document.getElementById(id);
 
-let items = [], view = 'all', editingId = null, pendingImg = null;
+let items = [], view = 'all', editingId = null, pendingImg = null, pendingHist = [];
 let cloud = null; // {db, fs, team}
 
 /* ---------- utils ---------- */
@@ -346,22 +357,29 @@ function render(){
   const sortCards = arr => arr.sort((a,b)=>(order[a.pri]-order[b.pri]) || ((a.due||'9')>(b.due||'9')?1:-1));
   // 靈感／設計稿／打樣頁：沒有外框，只有上傳格＋款式
   if(stageView && stageView.k!=='live'){
-    const idx = STAGES.indexOf(stageView);
     const cards = sortCards(list.filter(it=>it.stage===stageView.k));
     $('board').className = 'board gallery';
-    $('board').innerHTML = `<button class="upl" data-upload="${stageView.k}"><span class="plus">+</span><span>上傳圖片</span></button>` + cards.map(it=>card(it,idx)).join('');
+    $('board').innerHTML = `<button class="upl" data-upload="${stageView.k}"><span class="plus">+</span><span>上傳圖片</span></button>` + cards.map(card).join('');
+    renderSide(stageView);
+    return;
+  }
+  // 已逾期／急件：直接卡片
+  if(view==='late' || view==='high'){
+    const cards = sortCards(list);
+    $('board').className = 'board gallery';
+    $('board').innerHTML = cards.length ? cards.map(card).join('') : `<div class="empty">目前沒有${view==='late'?'逾期':'急件'}的款式</div>`;
     renderSide(stageView);
     return;
   }
   // 首頁：只留上架
-  const shown = stageView ? [stageView] : (view==='all' ? [STAGES[3]] : STAGES);
+  const shown = [STAGES[3]];
   $('board').className = 'board' + (shown.length===1 ? ' single' : '');
   $('board').innerHTML = shown.map(s=>{
     const idx = STAGES.indexOf(s);
     const cards = sortCards(list.filter(it=>it.stage===s.k));
     return `<section class="col" id="col-${s.k}" data-stage="${s.k}">
       <div class="colhead"><span><span class="nm">${s.n}</span><span class="en">${s.en}</span></span><span class="n">${cards.length}</span></div>
-      <div class="cards">${cards.length? cards.map(it=>card(it,idx)).join('') : `<div class="empty">${s.k==='live'?'還沒有上架的款式':'把款式拖到這裡'}</div>`}</div>
+      <div class="cards">${cards.length? cards.map(card).join('') : `<div class="empty">${s.k==='live'?'還沒有上架的款式':'把款式拖到這裡'}</div>`}</div>
     </section>`;
   }).join('');
   renderSide(stageView);
@@ -391,8 +409,10 @@ function renderSide(stageView){
   $('seriesBox').style.display = series.length ? '' : 'none';
   $('navSeries').innerHTML = series.map(s=>`<button data-series="${esc(s)}" class="${s===fsVal?'on':''}"><span>${esc(s)}</span><span class="c">${items.filter(i=>i.series===s).length}</span></button>`).join('');
 }
-function card(it, idx){
+const VER_STAGES = ['sketch','sample'];
+function card(it){
   const d = dueInfo(it);
+  const sent = it.stage==='idea' && items.some(x=>x.from===it.id);
   return `<article class="card" draggable="true" data-id="${esc(it.id)}">
     ${it.img?`<img src="${it.img}" alt="" loading="lazy">`:''}
     <div class="cbody">
@@ -401,14 +421,16 @@ function card(it, idx){
         ${it.pri==='high'?`<span class="tag p-high">急件</span>`:''}
         <span class="tag">${esc(it.cat)}</span>
         ${it.series?`<span class="tag">${esc(it.series)}</span>`:''}
+        ${VER_STAGES.includes(it.stage)&&it.ver?`<span class="tag">${esc(it.ver)}</span>`:''}
+        ${sent?`<span class="tag">已送設計中</span>`:''}
       </div>
+      ${it.stage==='sketch'&&it.vdate?`<div class="meta">日期　${esc(it.vdate.replace(/-/g,'/'))}</div>`:''}
       ${it.fabric?`<div class="meta">布料　${esc(it.fabric)}</div>`:''}
       ${it.owner?`<div class="meta">負責　${esc(it.owner)}</div>`:''}
       <div class="cfoot">
         <span class="due ${d?.cls||''}">${d?d.t:''}</span>
         <span class="move">
-          ${idx>0?`<button data-mv="-1" title="上一階段">◀</button>`:''}
-          ${idx<STAGES.length-1?`<button data-mv="1" title="下一階段">▶</button>`:''}
+          ${it.stage!=='live'?`<button data-mv="1" title="${it.stage==='idea'?'複製到設計中':'推到下一階段'}">▶</button>`:''}
         </span>
       </div>
     </div>
@@ -426,9 +448,15 @@ $('side').addEventListener('click', e=>{
 });
 
 /* ---------- board interactions ---------- */
+function histOf(it){
+  if(it.history && it.history.length) return it.history.map(h=>({...h}));
+  return it.img ? [{img:it.img, ver:it.ver||'v1', st:it.stage, at:it.created||it.updated||Date.now()}] : [];
+}
 function moveTo(it, stage){
   if(it.stage===stage) return;
-  const n = {...it, stage}; upsert(n);
+  const n = {...it, stage};
+  if(stage==='sample'){ n.ver='v1'; n.history=histOf(it); }
+  upsert(n);
   if(stage==='live') toast(`${it.name} 上架了`);
 }
 let uplStage = 'idea';
@@ -438,7 +466,14 @@ $('board').addEventListener('click', e=>{
   const c = e.target.closest('.card'); if(!c) return;
   const it = items.find(i=>i.id===c.dataset.id); if(!it) return;
   const mv = e.target.closest('[data-mv]');
-  if(mv){ const i = STAGES.findIndex(s=>s.k===it.stage) + Number(mv.dataset.mv); moveTo(it, STAGES[i].k); return; }
+  if(mv){
+    if(it.stage==='idea'){
+      upsert({...it, id:newId(), created:Date.now(), stage:'sketch', ver:'v1', vdate:'', history:histOf(it), from:it.id});
+      toast('已複製到設計中，靈感保留原樣');
+      return;
+    }
+    const i = STAGES.findIndex(s=>s.k===it.stage) + 1; moveTo(it, STAGES[i].k); return;
+  }
   openDlg(it);
 });
 $('board').addEventListener('dragstart', e=>{ const c=e.target.closest('.card'); if(!c) return; e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); });
@@ -453,14 +488,36 @@ $('board').addEventListener('drop', e=>{
 
 /* ---------- dialog ---------- */
 const dlg=$('dlg'), form=$('form'), preview=$('preview');
+const md = t => { const d=new Date(t); return `${d.getMonth()+1}/${d.getDate()}`; };
+const stShort = {idea:'靈感',sketch:'設計',sample:'打樣',live:'上架'};
+function fillVer(cur){
+  const nums = [cur, ...pendingHist.map(h=>h.ver)].map(v=>parseInt(String(v||'').replace(/\D/g,''))||1);
+  const max = Math.max(10, Math.max(...nums)+1);
+  $('verSel').innerHTML = Array.from({length:max},(_,i)=>`<option>v${i+1}</option>`).join('');
+  $('verSel').value = cur || 'v1';
+}
+function renderThumbs(){
+  $('thumbs').innerHTML = pendingHist.map((h,i)=>`<div class="thumb ${h.img===pendingImg?'on':''}" data-i="${i}">
+      <img src="${h.img}" alt=""><span class="lb">${esc(stShort[h.st]||'')} ${esc(h.ver||'')}<br>${md(h.at)}</span>
+      <button type="button" class="x" data-del="${i}" title="刪除這張">×</button></div>`).join('');
+  const st = form.elements.stage.value;
+  $('histWrap').style.display = VER_STAGES.includes(st) && pendingHist.length ? '' : 'none';
+}
+function stageUI(){
+  const st = form.elements.stage.value;
+  $('verWrap').style.display = VER_STAGES.includes(st) ? '' : 'none';
+  $('vdateWrap').style.display = st==='sketch' ? '' : 'none';
+  renderThumbs();
+}
+function showPreview(){ preview.style.display = pendingImg ? 'block' : 'none'; preview.src = pendingImg || ''; }
 function openDlg(it){
-  editingId = it?.id || null; pendingImg = it?.img || null;
+  editingId = it?.id || null; pendingImg = it?.img || null; pendingHist = it ? histOf(it) : [];
   form.reset();
   $('dTitle').textContent = it ? '編輯款式' : '新增款式';
   $('delBtn').style.visibility = it ? 'visible' : 'hidden';
   const v = it || {stage: STAGES.some(s=>s.k===view)?view:'idea', pri:'mid', cat:'上衣', series:$('fSeries').value};
-  for(const k of ['name','series','cat','stage','pri','due','owner','fabric','note']) form.elements[k].value = v[k] || '';
-  preview.style.display = pendingImg ? 'block' : 'none'; preview.src = pendingImg || '';
+  for(const k of ['name','series','cat','stage','pri','due','owner','fabric','note','vdate']) form.elements[k].value = v[k] || '';
+  fillVer(v.ver || 'v1'); showPreview(); stageUI();
   closeSide(); dlg.showModal();
 }
 $('addBtn').onclick = ()=>openDlg(null);
@@ -471,7 +528,9 @@ form.addEventListener('submit', e=>{
   e.preventDefault();
   const data = Object.fromEntries(new FormData(form).entries());
   const base = editingId ? items.find(i=>i.id===editingId) : {id:newId(), created:Date.now()};
-  upsert({...base, ...data, img: pendingImg || null});
+  const obj = {...base, ...data, img: pendingImg || null, history: pendingHist};
+  if(JSON.stringify(obj).length > 900000) return toast('這個款式的圖片太多了，請刪掉幾張舊圖再儲存');
+  upsert(obj);
   dlg.close(); toast('已儲存');
 });
 function compress(f){
@@ -488,7 +547,23 @@ function compress(f){
 }
 $('imgInput').addEventListener('change', async e=>{
   const f=e.target.files[0]; if(!f) return;
-  try{ pendingImg = await compress(f); preview.src=pendingImg; preview.style.display='block'; }catch(_){ toast('這張圖片讀不了'); }
+  e.target.value='';
+  try{
+    pendingImg = await compress(f);
+    pendingHist.push({img:pendingImg, ver:$('verSel').value||'v1', st:form.elements.stage.value, at:Date.now()});
+    showPreview(); renderThumbs();
+  }catch(_){ toast('這張圖片讀不了'); }
+});
+$('stageSel').addEventListener('change', stageUI);
+$('thumbs').addEventListener('click', e=>{
+  const del = e.target.closest('[data-del]');
+  if(del){
+    const [h] = pendingHist.splice(Number(del.dataset.del),1);
+    if(h && h.img===pendingImg) pendingImg = pendingHist.length ? pendingHist[pendingHist.length-1].img : null;
+    showPreview(); renderThumbs(); return;
+  }
+  const t = e.target.closest('[data-i]'); if(!t) return;
+  pendingImg = pendingHist[Number(t.dataset.i)].img; showPreview(); renderThumbs();
 });
 $('uplInput').addEventListener('change', async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
@@ -498,7 +573,8 @@ $('uplInput').addEventListener('change', async e=>{
     try{
       const img = await compress(f);
       await upsert({id:newId(), created:Date.now(), name:f.name.replace(/\.[^.]+$/,'') || '未命名', series:$('fSeries').value||'',
-        cat:'其他', stage:uplStage, pri:'mid', due:'', owner:'', fabric:'', note:'', img});
+        cat:'其他', stage:uplStage, pri:'mid', due:'', owner:'', fabric:'', note:'', img, ver:'v1', vdate:'',
+        history:[{img, ver:'v1', st:uplStage, at:Date.now()}]});
       n++;
     }catch(_){}
   }
@@ -511,12 +587,12 @@ $('xlsBtn').onclick = ()=>{
   const fmt = t => t ? new Date(t).toLocaleDateString('zh-TW') : '';
   const sn = k => STAGES.find(s=>s.k===k)?.n || k;
   const rows = [...items].sort((a,b)=>STAGES.findIndex(s=>s.k===a.stage)-STAGES.findIndex(s=>s.k===b.stage))
-    .map(it=>({'款式名稱':it.name,'系列':it.series||'','類別':it.cat||'','階段':sn(it.stage),'優先度':PRI[it.pri]||'',
+    .map(it=>({'款式名稱':it.name,'系列':it.series||'','類別':it.cat||'','階段':sn(it.stage),'版本':VER_STAGES.includes(it.stage)?(it.ver||'v1'):'','日期':it.vdate||'','優先度':PRI[it.pri]||'',
       '截止日':it.due||'','狀態':dueInfo(it)?.t||'','負責人／工廠':it.owner||'','布料／配色':it.fabric||'','備註':it.note||'',
       '建立日期':fmt(it.created),'最後更新':fmt(it.updated)}));
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows.length?rows:[{'款式名稱':''}]);
-  ws['!cols'] = [24,14,8,8,8,12,12,16,24,36,12,12].map(w=>({wch:w}));
+  ws['!cols'] = [24,14,8,8,6,12,8,12,12,16,24,36,12,12].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(wb, ws, '全部款式');
   STAGES.forEach(s=>{
     const r = rows.filter(x=>x['階段']===s.n);
