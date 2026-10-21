@@ -110,6 +110,10 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
 .thumb.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
 .thumb .x{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(42,37,37,.75);color:#fff;font-size:12px;line-height:18px;text-align:center}
 .board.gallery .empty{grid-column:1/-1}
+.thumbs.refs{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.thumb.add{display:flex;flex-direction:column;align-items:center;justify-content:center;aspect-ratio:1;border-style:dashed;border-color:rgba(42,37,37,.4);font-size:12px;letter-spacing:2px;background:rgba(250,246,244,.4)}
+.thumb.add b{font-family:var(--serif);font-size:34px;font-weight:400;line-height:1}
+.card.idea .cbody{padding:9px 13px}
 .dfoot{padding:12px 20px 20px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .danger{color:var(--late);border-color:var(--late)}
 .note{font-size:13px;color:var(--ink2);line-height:1.7;padding:16px 20px 0}
@@ -150,9 +154,9 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
       <p class="navt">快速篩選</p>
       <nav id="navQuick"></nav>
     </div>
-    <div id="seriesBox">
-      <p class="navt">系列</p>
-      <nav id="navSeries"></nav>
+    <div>
+      <p class="navt">類別</p>
+      <nav id="navCats"></nav>
     </div>
     <div class="side-actions">
       <button class="btn dark" id="addBtn">＋ 新增款式</button>
@@ -227,6 +231,23 @@ label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute
   </form>
 </dialog>
 
+<dialog id="refDlg">
+  <form id="refForm">
+    <div class="dhead">參考圖</div>
+    <div class="dgrid">
+      <img id="refBig" class="preview full" alt="">
+      <div class="full"><div class="thumbs refs" id="refThumbs"></div></div>
+    </div>
+    <div class="dfoot">
+      <button type="button" class="btn danger" id="refDel">刪除</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button type="button" class="btn" id="refCancel">取消</button>
+        <button type="submit" class="btn dark">儲存</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+<input type="file" id="refInput" accept="image/*" multiple hidden>
 <input type="file" id="uplInput" accept="image/*" multiple hidden>
 <datalist id="seriesList"></datalist>
 <div class="toast" id="toast"></div>
@@ -340,7 +361,7 @@ $('teamForm').addEventListener('submit', e=>{
 });
 
 /* ---------- render ---------- */
-$('stageSel').innerHTML = STAGES.map(s=>`<option value="${s.k}">${s.n}</option>`).join('');
+$('stageSel').innerHTML = STAGES.filter(s=>s.k!=='idea').map(s=>`<option value="${s.k}">${s.n}</option>`).join('');
 
 function filtered(){
   const q = $('q').value.trim().toLowerCase(), fs = $('fSeries').value, fp = $('fPri').value;
@@ -363,9 +384,18 @@ function render(){
     renderSide(stageView);
     return;
   }
+  // 類別快捷：直接卡片
+  if(view.startsWith('cat:')){
+    const c = view.slice(4);
+    const cards = sortCards(list.filter(it=>it.stage!=='idea' && it.cat===c));
+    $('board').className = 'board gallery';
+    $('board').innerHTML = cards.length ? cards.map(card).join('') : `<div class="empty">目前沒有「${esc(c)}」的款式</div>`;
+    renderSide(null);
+    return;
+  }
   // 已逾期／急件：直接卡片
   if(view==='late' || view==='high'){
-    const cards = sortCards(list);
+    const cards = sortCards(list.filter(it=>it.stage!=='idea'));
     $('board').className = 'board gallery';
     $('board').innerHTML = cards.length ? cards.map(card).join('') : `<div class="empty">目前沒有${view==='late'?'逾期':'急件'}的款式</div>`;
     renderSide(stageView);
@@ -392,7 +422,7 @@ function renderSide(stageView){
   $('sLate').textContent  = items.filter(i=>dueInfo(i)?.cls==='late').length;
 
   const titles = {all:'首頁', late:'已逾期', high:'急件'};
-  $('viewTitle').textContent = stageView ? stageView.n : titles[view];
+  $('viewTitle').textContent = stageView ? stageView.n : (view.startsWith('cat:') ? view.slice(4) : titles[view]);
 
   // sidebar
   const cnt = k => items.filter(i=>i.stage===k).length;
@@ -407,11 +437,21 @@ function renderSide(stageView){
   const fsVal = $('fSeries').value;
   $('fSeries').innerHTML = '<option value="">全部系列</option>' + series.map(s=>`<option ${s===fsVal?'selected':''}>${esc(s)}</option>`).join('');
   $('seriesList').innerHTML = series.map(s=>`<option value="${esc(s)}">`).join('');
-  $('seriesBox').style.display = series.length ? '' : 'none';
-  $('navSeries').innerHTML = series.map(s=>`<button data-series="${esc(s)}" class="${s===fsVal?'on':''}"><span>${esc(s)}</span><span class="c">${items.filter(i=>i.series===s).length}</span></button>`).join('');
+  $('navCats').innerHTML = CATS.map(c=>`<button data-view="cat:${c}" class="${view==='cat:'+c?'on':''}"><span>${c}</span><span class="c">${items.filter(i=>i.stage!=='idea'&&i.cat===c).length}</span></button>`).join('');
 }
 const VER_STAGES = ['sketch','sample'];
+const CATS = ['上衣','褲子','裙子','洋裝','外套','套裝','配件','其他'];
 function card(it){
+  if(it.stage==='idea'){
+    const n = histOf(it).length, sent = items.some(x=>x.from===it.id);
+    return `<article class="card idea" data-id="${esc(it.id)}">
+      ${it.img?`<img src="${it.img}" alt="" loading="lazy">`:''}
+      <div class="cbody"><div class="cfoot">
+        <span class="meta">參考圖 · ${n} 張${sent?'　<span class="tag">已送設計中</span>':''}</span>
+        <span class="move"><button data-mv="1" title="下一階段：填寫款式資料">▶</button></span>
+      </div></div>
+    </article>`;
+  }
   const d = dueInfo(it);
   const sent = it.stage==='idea' && items.some(x=>x.from===it.id);
   return `<article class="card" draggable="true" data-id="${esc(it.id)}">
@@ -469,13 +509,12 @@ $('board').addEventListener('click', e=>{
   const mv = e.target.closest('[data-mv]');
   if(mv){
     if(it.stage==='idea'){
-      upsert({...it, id:newId(), created:Date.now(), stage:'sketch', ver:'v1', vdate:'', note:'', notes:{}, history:histOf(it), from:it.id});
-      toast('已複製到設計中，靈感保留原樣');
+      openDlg(null, {stage:'sketch', ver:'v1', pri:'mid', cat:'上衣', series:$('fSeries').value, img:it.img, history:histOf(it), from:it.id});
       return;
     }
     const i = STAGES.findIndex(s=>s.k===it.stage) + 1; moveTo(it, STAGES[i].k); return;
   }
-  openDlg(it);
+  if(it.stage==='idea') openRef(it); else openDlg(it);
 });
 $('board').addEventListener('dragstart', e=>{ const c=e.target.closest('.card'); if(!c) return; e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); });
 $('board').addEventListener('dragend', e=>e.target.closest('.card')?.classList.remove('dragging'));
@@ -521,14 +560,17 @@ function stageUI(){
   renderThumbs();
 }
 function showPreview(){ preview.style.display = pendingImg ? 'block' : 'none'; preview.src = pendingImg || ''; }
-function openDlg(it){
-  editingId = it?.id || null; pendingImg = it?.img || null; pendingHist = it ? histOf(it) : [];
+let pendingFrom = null;
+function openDlg(it, draft){
+  if(!it && !draft && view==='idea'){ uplStage='idea'; $('uplInput').click(); return; }
+  editingId = it?.id || null; pendingFrom = draft?.from || null;
+  pendingImg = it?.img || draft?.img || null; pendingHist = it ? histOf(it) : (draft?.history||[]);
   pendingNotes = {...(it?.notes||{})};
   if(it && !it.notes && it.note) pendingNotes[keyFor(it.stage, it.ver)] = it.note;
   form.reset();
-  $('dTitle').textContent = it ? '編輯款式' : '新增款式';
+  $('dTitle').textContent = it ? '編輯款式' : (draft ? '新增款式（來自靈感）' : '新增款式');
   $('delBtn').style.visibility = it ? 'visible' : 'hidden';
-  const v = it || {stage: STAGES.some(s=>s.k===view)?view:'idea', pri:'mid', cat:'上衣', series:$('fSeries').value};
+  const v = it || draft || {stage: ['sketch','sample','live'].includes(view)?view:'sketch', pri:'mid', cat:'上衣', series:$('fSeries').value};
   for(const k of ['name','series','cat','stage','pri','due','owner','fabric','note','vdate']) form.elements[k].value = v[k] || '';
   fillVer(v.ver || 'v1');
   noteKey = keyFor(form.elements.stage.value, $('verSel').value);
@@ -543,7 +585,7 @@ $('delBtn').onclick = ()=>{ if(!confirm('確定刪除這個款式？')) return; 
 form.addEventListener('submit', e=>{
   e.preventDefault();
   const data = Object.fromEntries(new FormData(form).entries());
-  const base = editingId ? items.find(i=>i.id===editingId) : {id:newId(), created:Date.now()};
+  const base = editingId ? items.find(i=>i.id===editingId) : {id:newId(), created:Date.now(), ...(pendingFrom?{from:pendingFrom}:{})};
   pendingNotes[noteKey] = form.elements.note.value;
   const obj = {...base, ...data, img: pendingImg || null, history: pendingHist, notes: pendingNotes};
   if(JSON.stringify(obj).length > 900000) return toast('這個款式的圖片太多了，請刪掉幾張舊圖再儲存');
@@ -586,6 +628,14 @@ $('thumbs').addEventListener('click', e=>{
 $('uplInput').addEventListener('change', async e=>{
   const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
   toast(`上傳中… (${files.length} 張)`);
+  if(uplStage==='idea'){
+    const hist=[];
+    for(const f of files){ try{ hist.push({img:await compress(f), ver:'', st:'idea', at:Date.now()}); }catch(_){} }
+    if(!hist.length) return toast('圖片讀不了，請換一張');
+    await upsert({id:newId(), created:Date.now(), name:'參考圖', series:'', cat:'', stage:'idea', pri:'mid', due:'', owner:'', fabric:'', note:'',
+      img:hist[0].img, history:hist});
+    return toast(`已新增參考圖（${hist.length} 張）`);
+  }
   let n=0;
   for(const f of files){
     try{
@@ -597,6 +647,43 @@ $('uplInput').addEventListener('change', async e=>{
     }catch(_){}
   }
   toast(n ? `已上傳 ${n} 張，點圖片可以改名稱和細節` : '圖片讀不了，請換一張');
+});
+
+/* ---------- 參考圖（靈感） ---------- */
+let refItem=null, refHist=[], refCover=null;
+function renderRef(){
+  $('refBig').src = refCover||''; $('refBig').style.display = refCover ? 'block' : 'none';
+  $('refThumbs').innerHTML = refHist.map((h,i)=>`<div class="thumb ${h.img===refCover?'on':''}" data-i="${i}">
+      <img src="${h.img}" alt=""><button type="button" class="x" data-del="${i}" title="刪除這張">×</button></div>`).join('')
+    + `<button type="button" class="thumb add" id="refAdd"><b>+</b>新增參考圖</button>`;
+}
+function openRef(it){
+  refItem = it; refHist = histOf(it); refCover = it.img || refHist[0]?.img || null;
+  renderRef(); closeSide(); $('refDlg').showModal();
+}
+$('refThumbs').addEventListener('click', e=>{
+  if(e.target.closest('#refAdd')) return $('refInput').click();
+  const del = e.target.closest('[data-del]');
+  if(del){
+    const [h] = refHist.splice(Number(del.dataset.del),1);
+    if(h && h.img===refCover) refCover = refHist[0]?.img || null;
+    return renderRef();
+  }
+  const t = e.target.closest('[data-i]'); if(t){ refCover = refHist[Number(t.dataset.i)].img; renderRef(); }
+});
+$('refInput').addEventListener('change', async e=>{
+  const files=[...e.target.files]; e.target.value='';
+  for(const f of files){ try{ const img=await compress(f); refHist.push({img, ver:'', st:'idea', at:Date.now()}); if(!refCover) refCover=img; }catch(_){ toast('有圖片讀不了'); } }
+  renderRef();
+});
+$('refCancel').onclick = ()=>$('refDlg').close();
+$('refDel').onclick = ()=>{ if(!confirm('確定刪除這組參考圖？')) return; removeItem(refItem.id); $('refDlg').close(); };
+$('refForm').addEventListener('submit', e=>{
+  e.preventDefault();
+  if(!refHist.length) return toast('至少要留一張參考圖，或按「刪除」');
+  const obj = {...refItem, img:refCover, history:refHist};
+  if(JSON.stringify(obj).length > 900000) return toast('參考圖太多了，請刪掉幾張再儲存');
+  upsert(obj); $('refDlg').close(); toast('已儲存');
 });
 
 /* ---------- Excel ---------- */
