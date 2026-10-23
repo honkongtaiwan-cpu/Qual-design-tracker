@@ -308,8 +308,10 @@ function dueInfo(it){
 const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 /* ---------- storage layer ---------- */
+const vrank = v => !v ? 3 : /^\d/.test(v) ? 0 : /^[A-Za-z]/.test(v) ? 1 : 2;
+const vcmp = (a,b) => vrank(a)-vrank(b) || String(a||'').localeCompare(String(b||''), 'en', {numeric:true, sensitivity:'base'});
 function vendorList(){
-  return [...new Set([...vendorsSaved, ...items.filter(i=>i.stage!=='idea').map(i=>i.owner).filter(Boolean)])];
+  return [...new Set([...vendorsSaved, ...items.filter(i=>i.stage!=='idea').map(i=>i.owner).filter(Boolean)])].sort(vcmp);
 }
 async function saveVendors(list){
   vendorsSaved = list;
@@ -441,7 +443,7 @@ function renderSide(stageView){
   const styleCount = new Set(items.filter(i=>i.stage!=='idea').map(sidOf)).size;
   $('sTotal').textContent = styleCount;
   $('sDone').textContent  = items.filter(i=>i.stage==='live').length;
-  $('sDoing').textContent = items.filter(i=>i.stage==='sketch'||i.stage==='sample').length;
+  $('sDoing').textContent = new Set(items.filter(i=>VER_STAGES.includes(i.stage)).map(sidOf)).size;
   $('sLate').textContent  = items.filter(i=>dueInfo(i)?.cls==='late').length;
 
   const titles = {all:'首頁', late:'已逾期', high:'急件', done:'已完成'};
@@ -528,10 +530,9 @@ async function advance(it){
   if(it.stage==='sketch'){
     const ex = items.find(x=>x.stage==='sample' && sidOf(x)===sid);
     if(ex) return toast('打樣裡已經有這一款了，直接在打樣頁更新版本');
-    const notes={...(it.notes||{})}, vdates={...(it.vdates||{})};
-    await upsert({...it, id:newId(), created:Date.now(), stage:'sample', sid, ver:'v1',
-      note:notes['sample:v1']||'', vdate:vdates['sample:v1']||'', notes, vdates, history:histOf(it)});
-    toast('已複製到打樣，設計中保留原樣');
+    const {id, created, updated, history, img, ...rest} = it;
+    openDlg(null, {...rest, stage:'sample', ver:'v1', sid, dver:it.ver||'v1', img:null, history:[], needImg:true,
+      notes:{...(it.notes||{})}, vdates:{...(it.vdates||{})}});
   } else if(it.stage==='sample'){
     if(!confirm(`「${it.name}」要上架嗎？\n上架後會出現在首頁和「已完成」，設計中和打樣裡的同款會移除。`)) return;
     const dups = items.filter(x=>x.id!==it.id && VER_STAGES.includes(x.stage) && sidOf(x)===sid);
@@ -604,17 +605,18 @@ function stageUI(){
   renderThumbs();
 }
 function showPreview(){ preview.style.display = pendingImg ? 'block' : 'none'; preview.src = pendingImg || ''; }
-let pendingFrom = null;
+let pendingFrom = null, pendingExtra = {}, pendingNeedImg = false;
 function openDlg(it, draft){
   if(!it && !draft && view==='idea'){ uplStage='idea'; $('uplInput').click(); return; }
-  editingId = it?.id || null; pendingFrom = draft?.from || null;
+  editingId = it?.id || null; pendingFrom = draft?.from || null; pendingNeedImg = !!draft?.needImg;
+  pendingExtra = draft ? Object.fromEntries(['sid','dver'].filter(k=>draft[k]!=null).map(k=>[k,draft[k]])) : {};
   pendingImg = it?.img || draft?.img || null; selIdx = null; pendingHist = it ? histOf(it) : (draft?.history||[]);
-  pendingNotes = {...(it?.notes||{})};
+  pendingNotes = {...((it||draft)?.notes||{})};
   if(it && !it.notes && it.note) pendingNotes[keyFor(it.stage, it.ver)] = it.note;
-  pendingDates = {...(it?.vdates||{})};
+  pendingDates = {...((it||draft)?.vdates||{})};
   if(it && !it.vdates && it.vdate) pendingDates[keyFor(it.stage, it.ver)] = it.vdate;
   form.reset();
-  $('dTitle').textContent = it ? '編輯款式' : (draft ? '新增款式（來自靈感）' : '新增款式');
+  $('dTitle').textContent = it ? '編輯款式' : draft?.needImg ? '移到打樣（請上傳打樣圖）' : (draft ? '新增款式（來自靈感）' : '新增款式');
   $('delBtn').style.visibility = it ? 'visible' : 'hidden';
   const v = it || draft || {stage: ['sketch','sample','live'].includes(view)?view:'sketch', pri:'mid', cat:'上衣', series:$('fSeries').value, owner: view.startsWith('ven:')?view.slice(4):''};
   fillVenSel(v.owner||'');
@@ -633,13 +635,14 @@ $('delBtn').onclick = ()=>{ if(!confirm('確定刪除這個款式？')) return; 
 form.addEventListener('submit', e=>{
   e.preventDefault();
   const data = Object.fromEntries(new FormData(form).entries());
-  const base = editingId ? items.find(i=>i.id===editingId) : {id:newId(), created:Date.now(), ...(pendingFrom?{from:pendingFrom}:{})};
+  if(pendingNeedImg && !pendingHist.length) return toast('請先上傳新的打樣圖片，才能移到打樣');
+  const base = editingId ? items.find(i=>i.id===editingId) : {id:newId(), created:Date.now(), ...(pendingFrom?{from:pendingFrom}:{}), ...pendingExtra};
   pendingNotes[noteKey] = form.elements.note.value;
   pendingDates[noteKey] = form.elements.vdate.value;
   const obj = {...base, ...data, img: pendingImg || null, history: pendingHist, notes: pendingNotes, vdates: pendingDates};
   if(JSON.stringify(obj).length > 900000) return toast('這個款式的圖片太多了，請刪掉幾張舊圖再儲存');
   upsert(obj);
-  dlg.close(); toast('已儲存');
+  dlg.close(); toast(pendingNeedImg ? '已移到打樣，設計中保留原樣' : '已儲存');
 });
 function compress(f){
   return new Promise((res,rej)=>{
@@ -808,7 +811,7 @@ async function buildXlsx(sheets){
     }).join('');
     const pane = sh.freeze ? `<pane ySplit="${sh.freeze}" topLeftCell="A${sh.freeze+1}" activePane="bottomLeft" state="frozen"/>` : '';
     add(`xl/worksheets/sheet${n}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"${si===0?' tabSelected="1"':''} showGridLines="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${sh.widths.map((w,c)=>`<col min="${c+1}" max="${c+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rowsXml}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${pics.length?'<drawing r:id="rId1"/>':''}</worksheet>`);
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"${si===0?' tabSelected="1"':''} showGridLines="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${sh.widths.map((w,c)=>`<col min="${c+1}" max="${c+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rowsXml}</sheetData>${sh.filter&&sh.rows.length>1?`<autoFilter ref="A1:${colName(sh.widths.length-1)}${sh.rows.length}"/>`:''}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${pics.length?'<drawing r:id="rId1"/>':''}</worksheet>`);
     ct.push(`<Override PartName="/xl/worksheets/sheet${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
     if(pics.length){
       add(`xl/worksheets/_rels/sheet${n}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -827,7 +830,10 @@ async function buildXlsx(sheets){
   });
   for(const [u,m] of media) add(`xl/media/${m.file}`, dataUrlBytes(u));
   add('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sh,i)=>`<sheet name="${xesc(sh.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`);
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sh,i)=>`<sheet name="${xesc(sh.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets>${(()=>{
+    const dn = sheets.map((sh,i)=>sh.filter&&sh.rows.length>1 ? `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${xesc(sh.name.replace(/'/g,"''"))}'!$A$1:$${colName(sh.widths.length-1)}$${sh.rows.length}</definedName>` : '').join('');
+    return dn ? `<definedNames>${dn}</definedNames>` : '';
+  })()}</workbook>`);
   add('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((sh,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
   add('xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -852,15 +858,25 @@ function styles(list){ // 每款只留最新階段
   for(const it of list){ if(it.stage==='idea') continue; const k=sidOf(it), cur=m.get(k); if(!cur || rank(it.stage)>rank(cur.stage)) m.set(k,it); }
   return [...m.values()];
 }
-function detailSheet(name, list, withVendor){
+function designVer(it){
+  if(it.stage==='sketch') return it.ver||'v1';
+  const sk = items.find(x=>x.stage==='sketch' && sidOf(x)===sidOf(it));
+  return sk ? (sk.ver||'v1') : (it.dver||'');
+}
+function sampleVer(it){
+  if(it.stage==='sample'||it.stage==='live') return it.ver||'v1';
+  const sp = items.find(x=>(x.stage==='sample'||x.stage==='live') && sidOf(x)===sidOf(it));
+  return sp ? (sp.ver||'v1') : '';
+}
+// mode: 'both'（設計＋打樣）/'design'/'sample'
+function detailSheet(name, list, withVendor, mode){
+  const vcols = mode==='design' ? [['設計',8,designVer]] : mode==='sample' ? [['打樣',8,sampleVer]] : [['設計',8,designVer],['打樣',8,sampleVer]];
   const cols = [['款式名稱',24,it=>it.name],['封面',19,()=>''],['系列',14,it=>it.series],['類別',8,it=>it.cat],
-    ...(withVendor?[['廠商',14,it=>it.owner]]:[]),
-    ['階段',8,it=>STAGES.find(s=>s.k===it.stage)?.n||''],['版本',7,it=>it.stage!=='idea'?(it.ver||'v1'):''],
-    ['打樣',12,it=>it.stage!=='idea'?sampleDate(sidOf(it)):''],['日期',12,it=>slash(it.vdate)],['優先度',8,it=>PRI[it.pri]||''],
+    ...(withVendor?[['廠商',14,it=>it.owner]]:[]), ...vcols,
+    ['日期',12,it=>slash(it.vdate)],['優先度',8,it=>PRI[it.pri]||''],
     ['截止日',12,it=>slash(it.due)],['布料／配色',24,it=>it.fabric],['備註',36,it=>it.note]];
-  const rank = k => STAGES.findIndex(s=>s.k===k);
-  const sorted = [...list].sort((a,b)=>rank(a.stage)-rank(b.stage) || String(a.cat||'').localeCompare(String(b.cat||'')));
-  return {name, widths:cols.map(c=>c[1]), freeze:1, imgCol:1,
+  const sorted = [...list].sort((a,b)=>(withVendor?vcmp(a.owner,b.owner):0) || String(a.cat||'').localeCompare(String(b.cat||'')) || String(a.name||'').localeCompare(String(b.name||'')));
+  return {name, widths:cols.map(c=>c[1]), freeze:1, imgCol:1, filter:true,
     rows:[{ht:24, cells:cols.map(c=>({v:c[0], s:S.HEAD}))},
       ...sorted.map(it=>({img:it.img||null, ht:22, cells:cols.map(c=>({v:c[2](it)??''}))}))]};
 }
@@ -878,10 +894,11 @@ function summarySheet(name){
   let tc=0, ta=0;
   for(const [v,list] of groups){
     const acc = list.filter(it=>it.cat==='配件').length, clo = list.length-acc; tc+=clo; ta+=acc;
-    rows.push({ht:26, cells:[{v}, {v:clo, num:1, s:S.NUM}, {v:acc, num:1, s:S.NUM}, {v:clo+acc, num:1, s:S.NUM}, {v:list.map(it=>it.name).join('、')}]});
+    const cats = CATS.map(c=>[c, list.filter(it=>(it.cat||'其他')===c).length]).filter(([,n])=>n).map(([c,n])=>`${c}×${n}`).join('、');
+    rows.push({ht:26, cells:[{v}, {v:clo, num:1, s:S.NUM}, {v:acc, num:1, s:S.NUM}, {v:clo+acc, num:1, s:S.NUM}, {v:cats}]});
   }
   rows.push({ht:28, cells:[{v:'合計', s:S.TOTL}, {v:tc, num:1, s:S.TOTN}, {v:ta, num:1, s:S.TOTN}, {v:tc+ta, num:1, s:S.TOTN}, {v:'', s:S.TOTL}]});
-  return {name, widths:[18,13,10,10,70], freeze:0, imgCol:0, rows};
+  return {name, widths:[18,13,10,10,50], freeze:0, imgCol:0, rows};
 }
 
 let xlsBusy = false;
@@ -893,11 +910,12 @@ $('xlsBtn').onclick = async ()=>{
       while(used.has(n.toLowerCase())) n = b.slice(0,27)+`(${i++})`; used.add(n.toLowerCase()); return n; };
     const sheets = [summarySheet(nm('QUAL自訂款總覽'))];
     const all = styles(items), vens = vendorList();
-    for(const v of vens){ const l=all.filter(it=>it.owner===v); if(l.length) sheets.push(detailSheet(nm(v), l, false)); }
+    for(const v of vens){ const l=all.filter(it=>it.owner===v); if(l.length) sheets.push(detailSheet(nm(v), l, false, 'both')); }
     const none = all.filter(it=>!it.owner || !vens.includes(it.owner));
-    if(none.length) sheets.push(detailSheet(nm('未指定廠商'), none, false));
-    sheets.push(detailSheet(nm('全部款式'), items, true));
-    STAGES.forEach(s=>{ const l=items.filter(x=>x.stage===s.k); if(l.length) sheets.push(detailSheet(nm(s.n), l, true)); });
+    if(none.length) sheets.push(detailSheet(nm('未指定廠商'), none, false, 'both'));
+    sheets.push(detailSheet(nm('全部款式'), all, true, 'both'));
+    const mode = {sketch:'design', sample:'sample', live:'both'};
+    STAGES.filter(s=>s.k!=='idea').forEach(s=>{ const l=items.filter(x=>x.stage===s.k); if(l.length) sheets.push(detailSheet(nm(s.n), l, true, mode[s.k])); });
     const blob = await buildXlsx(sheets);
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = `QUAL自訂款總覽-${new Date().toISOString().slice(0,10)}.xlsx`;
