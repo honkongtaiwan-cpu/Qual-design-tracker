@@ -7,7 +7,6 @@
 <title>QUAL 設計進度表</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#c2b7b5; --ink:#2a2525; --ink2:#4a4343; --muted:#7a706e; --line:rgba(42,37,37,.14);
@@ -698,25 +697,94 @@ $('refForm').addEventListener('submit', e=>{
   upsert(obj); $('refDlg').close(); toast('已儲存');
 });
 
-/* ---------- Excel ---------- */
-$('xlsBtn').onclick = ()=>{
-  if(!window.XLSX) return toast('Excel 元件還在載入，請稍候再試');
-  const fmt = t => t ? new Date(t).toLocaleDateString('zh-TW') : '';
-  const sn = k => STAGES.find(s=>s.k===k)?.n || k;
-  const rows = [...items].sort((a,b)=>STAGES.findIndex(s=>s.k===a.stage)-STAGES.findIndex(s=>s.k===b.stage))
-    .map(it=>({'款式名稱':it.name,'系列':it.series||'','類別':it.cat||'','階段':sn(it.stage),'版本':VER_STAGES.includes(it.stage)?(it.ver||'v1'):'','日期':it.vdate||'','優先度':PRI[it.pri]||'',
-      '截止日':it.due||'','狀態':dueInfo(it)?.t||'','負責人／工廠':it.owner||'','布料／配色':it.fabric||'','備註':it.note||'',
-      '建立日期':fmt(it.created),'最後更新':fmt(it.updated)}));
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows.length?rows:[{'款式名稱':''}]);
-  ws['!cols'] = [24,14,8,8,6,12,8,12,12,16,24,36,12,12].map(w=>({wch:w}));
-  XLSX.utils.book_append_sheet(wb, ws, '全部款式');
-  STAGES.forEach(s=>{
-    const r = rows.filter(x=>x['階段']===s.n);
-    if(r.length){ const w=XLSX.utils.json_to_sheet(r); w['!cols']=ws['!cols']; XLSX.utils.book_append_sheet(wb, w, s.n); }
+/* ---------- Excel（含封面縮圖，內建產生 .xlsx） ---------- */
+const XCOLS = [['款式名稱',24],['封面',19],['系列',14],['類別',8],['階段',8],['版本',7],['日期',12],['優先度',8],['截止日',12],['負責人／工廠',16],['布料／配色',24],['備註',36]];
+const IMG_COL = 1, BOX_W = 124, BOX_H = 92, ROW_PT = 75;
+const xesc = v => String(v??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const colName = i => String.fromCharCode(65+i);
+const CRC_T = (()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320^(c>>>1) : c>>>1; t[n]=c>>>0; } return t; })();
+function crc32(b){ let c=0xFFFFFFFF; for(let i=0;i<b.length;i++) c = CRC_T[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zip(files){ // files: [{name, data:Uint8Array}] — 不壓縮 (STORE)
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0;
+  const u16=v=>[v&255,(v>>>8)&255], u32=v=>[v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];
+  for(const f of files){
+    const nm=enc.encode(f.name), crc=crc32(f.data), sz=f.data.length;
+    const head=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(sz),...u32(sz),...u16(nm.length),...u16(0)]);
+    parts.push(head,nm,f.data);
+    central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(sz),...u32(sz),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]), nm);
+    off += head.length+nm.length+sz;
+  }
+  const cdSize = central.reduce((a,b)=>a+b.length,0);
+  const endRec=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cdSize),...u32(off),...u16(0)]);
+  return new Blob([...parts,...central,endRec],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function dataUrlBytes(u){ const b=atob(u.split(',')[1]); const a=new Uint8Array(b.length); for(let i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a; }
+function imgSize(src){ return new Promise(r=>{ const im=new Image(); im.onload=()=>r([im.naturalWidth,im.naturalHeight]); im.onerror=()=>r(null); im.src=src; }); }
+
+async function buildXlsx(sheets){ // sheets: [{name, rows:[{cells:[], img}]}]
+  const enc=new TextEncoder(), files=[], media=new Map(); // img dataURL -> {file, w, h}
+  for(const sh of sheets) for(const r of sh.rows) if(r.img && !media.has(r.img)){
+    const m = /^data:image\/(jpeg|jpg|png)/.exec(r.img); const sz = m && await imgSize(r.img);
+    if(sz) media.set(r.img, {file:`image${media.size+1}.${m[1]==='png'?'png':'jpeg'}`, w:sz[0], h:sz[1]});
+  }
+  const ct=[], add=(name,str)=>files.push({name, data: typeof str==='string'?enc.encode(str):str});
+  sheets.forEach((sh,si)=>{
+    const n=si+1, pics=[];
+    const rowsXml = [`<row r="1" ht="22" customHeight="1">${XCOLS.map(([h],c)=>`<c r="${colName(c)}1" t="inlineStr" s="1"><is><t>${xesc(h)}</t></is></c>`).join('')}</row>`]
+      .concat(sh.rows.map((r,ri)=>{
+        const R=ri+2, mi=r.img && media.get(r.img);
+        if(mi) pics.push({row:R-1, mi});
+        return `<row r="${R}"${mi?` ht="${ROW_PT}" customHeight="1"`:''}>${r.cells.map((v,c)=>`<c r="${colName(c)}${R}" t="inlineStr" s="2"><is><t xml:space="preserve">${xesc(v)}</t></is></c>`).join('')}</row>`;
+      })).join('');
+    add(`xl/worksheets/sheet${n}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${XCOLS.map(([,w],c)=>`<col min="${c+1}" max="${c+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rowsXml}</sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>${pics.length?'<drawing r:id="rId1"/>':''}</worksheet>`);
+    ct.push(`<Override PartName="/xl/worksheets/sheet${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+    if(pics.length){
+      add(`xl/worksheets/_rels/sheet${n}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${n}.xml"/></Relationships>`);
+      const uniq=[...new Set(pics.map(p=>p.mi.file))];
+      add(`xl/drawings/_rels/drawing${n}.xml.rels`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${uniq.map((f,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${f}"/>`).join('')}</Relationships>`);
+      add(`xl/drawings/drawing${n}.xml`, `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${pics.map((p,i)=>{
+        const k=Math.min(BOX_W/p.mi.w, BOX_H/p.mi.h, 1), w=Math.round(p.mi.w*k), h=Math.round(p.mi.h*k);
+        const ox=Math.round((BOX_W-w)/2+4), oy=Math.round((BOX_H-h)/2+4);
+        return `<xdr:oneCellAnchor><xdr:from><xdr:col>${IMG_COL}</xdr:col><xdr:colOff>${ox*9525}</xdr:colOff><xdr:row>${p.row}</xdr:row><xdr:rowOff>${oy*9525}</xdr:rowOff></xdr:from><xdr:ext cx="${w*9525}" cy="${h*9525}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i+2}" name="封面 ${i+1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId${uniq.indexOf(p.mi.file)+1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${w*9525}" cy="${h*9525}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+      }).join('')}</xdr:wsDr>`);
+      ct.push(`<Override PartName="/xl/drawings/drawing${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
+    }
   });
-  XLSX.writeFile(wb, `QUAL設計進度-${new Date().toISOString().slice(0,10)}.xlsx`);
-  toast('Excel 已下載');
+  for(const [u,m] of media) add(`xl/media/${m.file}`, dataUrlBytes(u));
+  add('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((sh,i)=>`<sheet name="${xesc(sh.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`);
+  add('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((sh,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
+  add('xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2A2525"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFD9D2D0"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`);
+  add('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
+  files.unshift({name:'[Content_Types].xml', data: enc.encode(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${ct.join('')}</Types>`)});
+  return zip(files);
+}
+
+let xlsBusy = false;
+$('xlsBtn').onclick = async ()=>{
+  if(xlsBusy) return; xlsBusy = true; toast('Excel 產生中…');
+  try{
+    const sn = k => STAGES.find(s=>s.k===k)?.n || k;
+    const toRow = it => ({stage:it.stage, img:it.img||null, cells:[it.name, '', it.series||'', it.cat||'', sn(it.stage),
+      VER_STAGES.includes(it.stage)?(it.ver||'v1'):'', it.vdate||'', PRI[it.pri]||'', it.due||'', it.owner||'', it.fabric||'', it.note||'']});
+    const rows = [...items].sort((a,b)=>STAGES.findIndex(s=>s.k===a.stage)-STAGES.findIndex(s=>s.k===b.stage)).map(toRow);
+    const sheets = [{name:'全部款式', rows}];
+    STAGES.forEach(s=>{ const r=rows.filter(x=>x.stage===s.k); if(r.length) sheets.push({name:s.n, rows:r}); });
+    const blob = await buildXlsx(sheets);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `QUAL設計進度-${new Date().toISOString().slice(0,10)}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    toast('Excel 已下載');
+  }catch(err){ console.error(err); toast('Excel 產生失敗，請再試一次'); }
+  xlsBusy = false;
 };
 
 /* ---------- start ---------- */
